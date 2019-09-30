@@ -869,6 +869,7 @@ const gradientSubtractShader = compileShader(gl.FRAGMENT_SHADER, `
     varying highp vec2 vB;
     uniform sampler2D uPressure;
     uniform sampler2D uVelocity;
+    uniform sampler2D uSolids;
 
     void main () {
         float L = texture2D(uPressure, vL).x;
@@ -876,20 +877,53 @@ const gradientSubtractShader = compileShader(gl.FRAGMENT_SHADER, `
         float T = texture2D(uPressure, vT).x;
         float B = texture2D(uPressure, vB).x;
         vec2 velocity = texture2D(uVelocity, vUv).xy;
+        float solid = texture2D(uSolids, vUv).x;
         velocity.xy -= vec2(R - L, T - B);
-        gl_FragColor = vec4(velocity, 0.0, 1.0);
+        gl_FragColor = vec4(velocity * (1.0-solid), 0.0, 1.0);
     }
 `);
 
+const passVertexShader = compileShader(gl.VERTEX_SHADER, `
+    precision highp float;
+
+    attribute vec2 aPosition;
+
+    void main () {
+        gl_Position = vec4(aPosition, 0.0, 1.0);
+    }
+`);
+
+const constructSolidShader = compileShader(gl.FRAGMENT_SHADER, `
+    precision mediump float;
+    precision mediump sampler2D;
+
+    void main () {
+        vec2 v2 = gl_FragCoord.xy;
+        float d = v2.x + v2.y;
+        if(d > 0.5)
+            gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+        else
+            gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+        //gl_FragColor = vec4(min(d,1.0), 0.0, 0.0, 1.0);
+    }
+`);
+
+const screenQuadVertexBuffer = gl.createBuffer();
+const screenQuadIndexBuffer = gl.createBuffer();
+
 const blit = (() => {
-    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+    gl.bindBuffer(gl.ARRAY_BUFFER, screenQuadVertexBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, -1, 1, 1, 1, 1, -1]), gl.STATIC_DRAW);
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.createBuffer());
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, screenQuadIndexBuffer);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array([0, 1, 2, 0, 2, 3]), gl.STATIC_DRAW);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(0);
 
     return (destination) => {
+        gl.bindBuffer(gl.ARRAY_BUFFER, screenQuadVertexBuffer);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, screenQuadIndexBuffer);
+        gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+        
         gl.bindFramebuffer(gl.FRAMEBUFFER, destination);
         gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
     }
@@ -904,6 +938,8 @@ let bloom;
 let bloomFramebuffers = [];
 let sunrays;
 let sunraysTemp;
+
+let solids;
 
 let ditheringTexture = createTextureAsync('LDR_LLL1_0.png');
 
@@ -924,6 +960,7 @@ const curlProgram            = new Program(baseVertexShader, curlShader);
 const vorticityProgram       = new Program(baseVertexShader, vorticityShader);
 const pressureProgram        = new Program(baseVertexShader, pressureShader);
 const gradienSubtractProgram = new Program(baseVertexShader, gradientSubtractShader);
+const constructSolidProgram  = new Program(passVertexShader, constructSolidShader);
 
 const displayMaterial = new Material(baseVertexShader, displayShaderSource);
 
@@ -950,6 +987,8 @@ function initFramebuffers () {
     divergence = createFBO      (simRes.width, simRes.height, r.internalFormat, r.format, texType, gl.NEAREST);
     curl       = createFBO      (simRes.width, simRes.height, r.internalFormat, r.format, texType, gl.NEAREST);
     pressure   = createDoubleFBO(simRes.width, simRes.height, r.internalFormat, r.format, texType, gl.NEAREST);
+
+    solids     = createFBO      (simRes.width, simRes.height, r.internalFormat, r.format, texType, gl.NEAREST);
 
     initBloomFramebuffers();
     initSunraysFramebuffers();
@@ -1111,9 +1150,30 @@ function updateKeywords () {
     displayMaterial.setKeywords(displayKeywords);
 }
 
+const Map1Vertices = new Float32Array([0, 0.25, -0.25, -0.25, 0.25, -0.25]);
+const Map1Indicies = new Uint16Array([0, 1, 2]);
+
+function initMap(){
+    gl.disable(gl.BLEND);
+    gl.viewport(0, 0, velocity.width, velocity.height);
+
+    constructSolidProgram.bind();
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+    gl.bufferData(gl.ARRAY_BUFFER, Map1Vertices, gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.createBuffer());
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, Map1Indicies, gl.STATIC_DRAW);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(0);
+    
+    gl.bindFramebuffer(gl.FRAMEBUFFER, solids.fbo);
+    gl.drawElements(gl.TRIANGLES, 3, gl.UNSIGNED_SHORT, 0);
+}
+
 updateKeywords();
 initFramebuffers();
-multipleSplats(parseInt(Math.random() * 20) + 5);
+initMap();
+// multipleSplats(parseInt(Math.random() * 20) + 5);
 
 let lastUpdateTime = Date.now();
 let colorUpdateTimer = 0.0;
@@ -1216,6 +1276,7 @@ function step (dt) {
     gl.uniform2f(gradienSubtractProgram.uniforms.texelSize, velocity.texelSizeX, velocity.texelSizeY);
     gl.uniform1i(gradienSubtractProgram.uniforms.uPressure, pressure.read.attach(0));
     gl.uniform1i(gradienSubtractProgram.uniforms.uVelocity, velocity.read.attach(1));
+    gl.uniform1i(gradienSubtractProgram.uniforms.uSolids, solids.attach(2));
     blit(velocity.write.fbo);
     velocity.swap();
 
