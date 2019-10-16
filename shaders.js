@@ -492,4 +492,30 @@ export const constructSolidShaderSrc = `
     }
 `;
 
+export const textureVertexShaderSrc = `
+    attribute vec2 aPosition;
+    attribute vec2 aTexcoord;
+    
+    uniform mat3 uMatrix;
+    
+    varying vec2 vTexcoord;
+    
+    void main() {
+    gl_Position = vec4((uMatrix * vec3(aPosition,1)).xy, 0.0, 1.0);
+    
+    vTexcoord = aTexcoord;
+}
+`;
+
+export const textureSampleShaderSrc = `
+    precision mediump float;
+    precision mediump sampler2D;
+
+    varying vec2 vTexcoord;
+    uniform sampler2D uTexture;
+
+    void main () {
+        gl_FragColor = texture2D(uTexture, vTexcoord);
+    }
+`;
 

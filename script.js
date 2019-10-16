@@ -23,39 +23,13 @@ SOFTWARE.
 */
 
 import * as shaders from './shaders.js'
+import {Actor} from './actor.js'
+import {config} from './context.js'
 
 'use strict';
 
 const canvas = document.getElementsByTagName('canvas')[0];
 resizeCanvas();
-
-let config = {
-    SIM_RESOLUTION: 128,
-    DYE_RESOLUTION: 1024,
-    CAPTURE_RESOLUTION: 512,
-    DENSITY_DISSIPATION: 1,
-    VELOCITY_DISSIPATION: 0.2,
-    PRESSURE: 0.8,
-    PRESSURE_ITERATIONS: 20,
-    CURL: 30,
-    SPLAT_RADIUS: 0.25,
-    SPLAT_FORCE: 6000,
-    SHADING: true,
-    COLORFUL: true,
-    COLOR_UPDATE_SPEED: 10,
-    PAUSED: false,
-    BACK_COLOR: { r: 0, g: 0, b: 0 },
-    TRANSPARENT: false,
-    BLOOM: true,
-    BLOOM_ITERATIONS: 8,
-    BLOOM_RESOLUTION: 256,
-    BLOOM_INTENSITY: 0.8,
-    BLOOM_THRESHOLD: 0.6,
-    BLOOM_SOFT_KNEE: 0.7,
-    SUNRAYS: true,
-    SUNRAYS_RESOLUTION: 196,
-    SUNRAYS_WEIGHT: 1.0,
-}
 
 function pointerPrototype () {
     this.id = -1;
@@ -86,7 +60,7 @@ if (!ext.supportLinearFiltering) {
     config.SUNRAYS = false;
 }
 
-startGUI();
+//startGUI();
 
 function getWebGLContext (canvas) {
     const params = { alpha: true, depth: false, stencil: false, antialias: false, preserveDrawingBuffer: false };
@@ -366,6 +340,13 @@ class Program {
     }
 }
 
+class Vec2 {
+    constructor (x,y){
+        this.x = x;
+        this.y = y;
+    }
+}
+
 function createProgram (vertexShader, fragmentShader) {
     let program = gl.createProgram();
     gl.attachShader(program, vertexShader);
@@ -432,6 +413,8 @@ const pressureShader        = compileShader(gl.FRAGMENT_SHADER, shaders.pressure
 const gradientSubtractShader= compileShader(gl.FRAGMENT_SHADER, shaders.gradientSubtractShaderSrc);
 const passVertexShader      = compileShader(gl.VERTEX_SHADER, shaders.passVertexShaderSrc);
 const constructSolidShader  = compileShader(gl.FRAGMENT_SHADER, shaders.constructSolidShaderSrc);
+const textureVertexShader   = compileShader(gl.VERTEX_SHADER, shaders.textureVertexShaderSrc);
+const textureSampleShader   = compileShader(gl.FRAGMENT_SHADER, shaders.textureSampleShaderSrc);
 
 const screenQuadVertexBuffer = gl.createBuffer();
 const screenQuadIndexBuffer = gl.createBuffer();
@@ -441,7 +424,7 @@ const blit = (() => {
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, -1, 1, 1, 1, 1, -1]), gl.STATIC_DRAW);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, screenQuadIndexBuffer);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array([0, 1, 2, 0, 2, 3]), gl.STATIC_DRAW);
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+//    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(0);
 
     return (destination) => {
@@ -486,6 +469,7 @@ const vorticityProgram       = new Program(baseVertexShader, vorticityShader);
 const pressureProgram        = new Program(baseVertexShader, pressureShader);
 const gradienSubtractProgram = new Program(baseVertexShader, gradientSubtractShader);
 const constructSolidProgram  = new Program(passVertexShader, constructSolidShader);
+const textureProgram         = new Program(textureVertexShader, textureSampleShader);
 
 const displayMaterial = new Material(baseVertexShader, shaders.displayShaderSource);
 
@@ -680,6 +664,7 @@ const Map1Indicies = new Uint16Array([0, 1, 2]);
 
 const solidVertexBuffer = gl.createBuffer();
 const solidIndexBuffer = gl.createBuffer();
+const texCoordBuffer = gl.createBuffer();
 
 function drawBuffer(vertexBuffer, indexBuffer, destination) {
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
@@ -695,20 +680,26 @@ function initMap(){
     gl.disable(gl.BLEND);
     gl.viewport(0, 0, velocity.width, velocity.height);
 
+    gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 0, 1, 1, 1, 1, 0]), gl.STATIC_DRAW);
+
     constructSolidProgram.bind();
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+    gl.bindBuffer(gl.ARRAY_BUFFER, solidVertexBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, Map1Vertices, gl.STATIC_DRAW);
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.createBuffer());
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, solidIndexBuffer);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, Map1Indicies, gl.STATIC_DRAW);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(0);
     
     gl.bindFramebuffer(gl.FRAMEBUFFER, solids.fbo);
-    gl.drawElements(gl.TRIANGLES, 3, gl.UNSIGNED_SHORT, 0);
+    gl.drawElements(gl.TRIANGLES, 3, gl.UNSIGNED_SHORT, 0); 
 }
 
 const simRes = getResolution(config.SIM_RESOLUTION);
+const present = new Actor(gl, new Vec2(50,50), new Vec2(0,0), 0);
+var actors = [present];
+
 updateKeywords();
 initFramebuffers();
 initMap();
@@ -880,6 +871,7 @@ function render (target) {
     if (target == null && config.TRANSPARENT)
         drawCheckerboard(fbo);
     drawDisplay(fbo, width, height);
+    drawActors(fbo, actors);
 }
 
 function drawColor (fbo, color) {
@@ -908,6 +900,29 @@ function drawDisplay (fbo, width, height) {
     if (config.SUNRAYS)
         gl.uniform1i(displayMaterial.uniforms.uSunrays, sunrays.attach(3));
     blit(fbo);
+}
+
+function drawActors(fbo, actors){
+
+    textureProgram.bind();
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, screenQuadVertexBuffer);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, screenQuadIndexBuffer);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    
+    gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+    gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(1);
+    
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.activeTexture(gl.TEXTURE0);
+
+    for(let i = 0; i < actors.length; ++i){
+        gl.bindTexture(gl.TEXTURE_2D, actors[i].texture);
+        gl.uniform1i(textureProgram.uniforms.uTexture, 0);
+        gl.uniformMatrix3fv(textureProgram.uniforms.uMatrix, false, actors[i].computeTransformation());
+        gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
+    }
 }
 
 function applyBloom (source, destination) {
