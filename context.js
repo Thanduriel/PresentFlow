@@ -29,3 +29,5 @@ export let config = {
     SUNRAYS_RESOLUTION: 196,
     SUNRAYS_WEIGHT: 1.0,
 }
+
+export const ASPECT_RATIO = config.MAP_SIZE_X / config.MAP_SIZE_Y;

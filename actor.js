@@ -1,6 +1,57 @@
 "use strict";
 
-import {config} from './context.js'
+import {config, ASPECT_RATIO} from './context.js'
+
+export class Vec2 {
+    constructor (x,y){
+        this.x = x;
+        this.y = y;
+    }
+
+    add(oth){
+        return new Vec2(this.x + oth.x, this.y + oth.y);
+    }
+
+    sub(oth){
+        return new Vec2(this.x - oth.x, this.y - oth.y);
+    }
+
+    scale(scalar){
+        return new Vec2(this.x * scalar, this.y * scalar);
+    }
+
+    dot(oth){
+        return this.x*oth.x + this.y*oth.y;
+    }
+
+    len(){
+        return Math.sqrt(this.dot(this));
+    }
+
+    toTexCoord(){
+        return new Vec2(this.x * 0.5 + 0.5 * config.MAP_SIZE_X, this.y * 0.5 + 0.5 * config.MAP_SIZE_Y);
+    }
+
+    toScreenSpace(){
+        return new Vec2(this.x / config.MAP_SIZE_X * 2.0 - 1.0, 
+            this.y / config.MAP_SIZE_Y * 2.0 - 1.0);
+    }
+}
+
+export let m2 = {
+    rotation: function(angleInRadians) {
+        var c = Math.cos(angleInRadians);
+        var s = Math.sin(angleInRadians);
+        return [
+          c,-s,
+          s, c,
+        ];
+      },
+      multiply: function(mat, vec){
+          return new Vec2(vec.x * mat[0] + vec.x * mat[2],
+            vec.y * mat[1] + vec.y * mat[3]);
+      }
+}
 
 let m3 = {
     translation: function(tx, ty) {
@@ -60,6 +111,8 @@ let m3 = {
             b20 * a02 + b21 * a12 + b22 * a22,
         ];
     },
+
+
 };
 
 export class Actor {
@@ -67,6 +120,9 @@ export class Actor {
         this.size = size;
         this.position = position;
         this.rotation = rotation;
+        this.velocity = new Vec2(100.0, 1.0);
+        this.angularVelocity = 1.0;
+        this.inertia = 0.25;
 
         // create texture
         this.texture = gl.createTexture();
@@ -79,15 +135,41 @@ export class Actor {
     }
 
     computeTransformation(){
-        var translation = m3.translation(this.position.x, this.position.y);
+        const posScreen = this.position.toScreenSpace();
+        var translation = m3.translation(posScreen.x, posScreen.y);
         var rotation    = m3.rotation(this.rotation);
         var scale       = m3.scaling(this.size.x / config.MAP_SIZE_X, 
-            this.size.y / config.MAP_SIZE_Y);
+            this.size.y / config.MAP_SIZE_X);
         
         var matrix = m3.multiply(translation, rotation);
         matrix = m3.multiply(matrix, scale);
 
-        return matrix;
+        const projection = m3.scaling(1.0, ASPECT_RATIO);
+
+        return m3.multiply(projection, matrix);
+    }
+
+    // last entry is the force applied directly to the center of mass
+    updateVelocity(velocities, positions, dt){
+        let addedVel = new Vec2(0,0);
+        let addedRot = 0;
+        for (let i = 0; i < velocities.length-1; i+=4) {
+            const v = velocities[i];
+            const pos = positions[i];
+            const l = v.len();
+            if(l < 0.0001) continue;
+            let centerDir = pos.sub(this.position);
+            centerDir = centerDir.scale(1 / centerDir.len());
+            const s = v.scale(1 / l).dot(centerDir);
+            addedVel = addedVel.add(v.scale(1-s));
+            addedRot += s * l;
+        }
+        addedVel = addedVel.add(velocities[velocities.length-1]);
+        const delta = 0.5*dt;
+        const vel = this.velocity.scale(1-delta).add(addedVel.scale(delta));
+        this.velocity = vel;
+        const rotDelta = this.inertia * dt * 0.5;
+        this.angularVelocity = this.angularVelocity * (1-rotDelta) + addedRot * rotDelta;
     }
 
 }

@@ -23,7 +23,7 @@ SOFTWARE.
 */
 
 import * as shaders from './shaders.js'
-import {Actor} from './actor.js'
+import {Vec2, Actor, m2} from './actor.js'
 import {config} from './context.js'
 
 'use strict';
@@ -337,13 +337,6 @@ class Program {
 
     bind () {
         gl.useProgram(this.program);
-    }
-}
-
-class Vec2 {
-    constructor (x,y){
-        this.x = x;
-        this.y = y;
     }
 }
 
@@ -697,7 +690,8 @@ function initMap(){
 }
 
 const simRes = getResolution(config.SIM_RESOLUTION);
-const present = new Actor(gl, new Vec2(50,50), new Vec2(0,0), 0);
+const simToPixelRatio = new Vec2(simRes.width / config.MAP_SIZE_X, simRes.height / config.MAP_SIZE_Y);
+const present = new Actor(gl, new Vec2(50,50), new Vec2(500,210), 0);
 var actors = [present];
 
 updateKeywords();
@@ -725,12 +719,31 @@ function update () {
 // gameplay update
 function process(dt) {
     // retrieve velocity field
-    var data = new Uint16Array(simRes.width * simRes.height * 2);
+    let data = new Uint16Array(simRes.width * simRes.height * 2);
     gl.bindFramebuffer(gl.FRAMEBUFFER, velocity.write.fbo);
     gl.readPixels(0, 0, simRes.width, simRes.height, ext.formatRG.format, ext.halfFloatTexType, data);
-/*    for (let i = 0; i < data.length; i++) {
-        if(data[i] != 0) console.info(decodeFloat16(data[i]));
-    }*/
+    for(let i = 0; i < actors.length; ++i){
+        let actor = actors[i];
+        actor.position = actor.position.add(actor.velocity.scale(dt));
+        actor.rotation += actor.angularVelocity * dt;
+        const rot = m2.rotation(actor.rotation);
+        const offset = actor.size.scale(0.5);
+        const p00 = actor.position.add(m2.multiply(rot, new Vec2(-offset.x, -offset.y)));
+        const p01 = actor.position.add(m2.multiply(rot, new Vec2(-offset.x, offset.y)));
+        const p10 = actor.position.add(m2.multiply(rot, new Vec2(offset.x, -offset.y)));
+        const p11 = actor.position.add(m2.multiply(rot, new Vec2(offset.x, offset.y)));
+        const v00 = readVelocity(data,p00);
+        const v01 = readVelocity(data,p01);
+        const v10 = readVelocity(data,p10);
+        const v11 = readVelocity(data,p11);
+        const v55 = readVelocity(data, actor.position).scale(2);
+        actor.updateVelocity([v00,v01,v10,v11,v55],[p00,p01,p10,p11],dt);
+    }
+}
+
+function readVelocity(data, position){
+    const idx = 2 * (Math.floor(position.x * simToPixelRatio.x) + Math.floor(position.y * simToPixelRatio.y) * simRes.width);
+    return new Vec2(decodeFloat16(data[idx]),decodeFloat16(data[idx+1]));
 }
 
 function calcDeltaTime () {
