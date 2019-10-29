@@ -2,41 +2,17 @@
 
 import {config, ASPECT_RATIO} from './context.js'
 
-export class Vec2 {
-    constructor (x,y){
-        this.x = x;
-        this.y = y;
-    }
+var Vec2 = planck.Vec2;
 
-    add(oth){
-        return new Vec2(this.x + oth.x, this.y + oth.y);
-    }
-
-    sub(oth){
-        return new Vec2(this.x - oth.x, this.y - oth.y);
-    }
-
-    scale(scalar){
-        return new Vec2(this.x * scalar, this.y * scalar);
-    }
-
-    dot(oth){
-        return this.x*oth.x + this.y*oth.y;
-    }
-
-    len(){
-        return Math.sqrt(this.dot(this));
-    }
-
-    toTexCoord(){
-        return new Vec2(this.x * 0.5 + 0.5 * config.MAP_SIZE_X, this.y * 0.5 + 0.5 * config.MAP_SIZE_Y);
-    }
-
-    toScreenSpace(){
-        return new Vec2(this.x / config.MAP_SIZE_X * 2.0 - 1.0, 
-            this.y / config.MAP_SIZE_Y * 2.0 - 1.0);
-    }
+function toTexCoord(v){
+    return new Vec2(v.x * 0.5 + 0.5 * config.MAP_SIZE_X, v.y * 0.5 + 0.5 * config.MAP_SIZE_Y);
 }
+
+function toScreenSpace(v){
+    return new Vec2(v.x / config.MAP_SIZE_X * 2.0 - 1.0, 
+        v.y / config.MAP_SIZE_Y * 2.0 - 1.0);
+}
+
 
 export let m2 = {
     rotation: function(angleInRadians) {
@@ -135,7 +111,7 @@ export class Actor {
     }
 
     computeTransformation(){
-        const posScreen = this.position.toScreenSpace();
+        const posScreen = toScreenSpace(this.position);
         var translation = m3.translation(posScreen.x, posScreen.y);
         var rotation    = m3.rotation(this.rotation);
         var scale       = m3.scaling(this.size.x / config.MAP_SIZE_X, 
@@ -153,23 +129,22 @@ export class Actor {
     updateVelocity(velocities, positions, dt){
         let addedVel = new Vec2(0,0);
         let addedRot = 0;
-        for (let i = 0; i < velocities.length-1; i+=4) {
+        for (let i = 0; i < velocities.length-1; i+=1) {
             const v = velocities[i];
             const pos = positions[i];
-            const l = v.len();
+            const l = v.length();
             if(l < 0.0001) continue;
-            let centerDir = pos.sub(this.position);
-            centerDir = centerDir.scale(1 / centerDir.len());
-            const s = v.scale(1 / l).dot(centerDir);
-            addedVel = addedVel.add(v.scale(1-s));
+            let centerDir = Vec2.sub(pos, this.position);
+            centerDir.mul(1 / centerDir.length());
+            const s = Vec2.dot(v.clone().mul(1 / l),centerDir);
+            addedVel.add(v.clone().mul(1-s));
             addedRot += s * l;
         }
-        addedVel = addedVel.add(velocities[velocities.length-1]);
+        addedVel.add(velocities[velocities.length-1]);
         const delta = 0.5*dt;
-        const vel = this.velocity.scale(1-delta).add(addedVel.scale(delta));
-        this.velocity = vel;
+        this.velocity = this.velocity.clone().mul(1-delta).add(addedVel.clone().mul(delta*10))
         const rotDelta = this.inertia * dt * 0.5;
-        this.angularVelocity = this.angularVelocity * (1-rotDelta) + addedRot * rotDelta;
+    //    this.angularVelocity = this.angularVelocity * (1-rotDelta) + addedRot * rotDelta;
     }
 
 }

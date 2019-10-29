@@ -23,8 +23,10 @@ SOFTWARE.
 */
 
 import * as shaders from './shaders.js'
-import {Vec2, Actor, m2} from './actor.js'
+import {Actor, m2} from './actor.js'
 import {config} from './context.js'
+
+var Vec2 = planck.Vec2;
 
 'use strict';
 
@@ -724,19 +726,21 @@ function process(dt) {
     gl.readPixels(0, 0, simRes.width, simRes.height, ext.formatRG.format, ext.halfFloatTexType, data);
     for(let i = 0; i < actors.length; ++i){
         let actor = actors[i];
-        actor.position = actor.position.add(actor.velocity.scale(dt));
+        let velocity = actor.velocity;
+        velocity.mul(dt);
+        actor.position.add(velocity);
         actor.rotation += actor.angularVelocity * dt;
         const rot = m2.rotation(actor.rotation);
-        const offset = actor.size.scale(0.5);
-        const p00 = actor.position.add(m2.multiply(rot, new Vec2(-offset.x, -offset.y)));
-        const p01 = actor.position.add(m2.multiply(rot, new Vec2(-offset.x, offset.y)));
-        const p10 = actor.position.add(m2.multiply(rot, new Vec2(offset.x, -offset.y)));
-        const p11 = actor.position.add(m2.multiply(rot, new Vec2(offset.x, offset.y)));
+        const offset = actor.size.clone().mul(0.5);
+        const p00 = Vec2.add(actor.position, m2.multiply(rot, new Vec2(-offset.x, -offset.y)));
+        const p01 = Vec2.add(actor.position, m2.multiply(rot, new Vec2(-offset.x, offset.y)));
+        const p10 = Vec2.add(actor.position, m2.multiply(rot, new Vec2(offset.x, -offset.y)));
+        const p11 = Vec2.add(actor.position, m2.multiply(rot, new Vec2(offset.x, offset.y)));
         const v00 = readVelocity(data,p00);
         const v01 = readVelocity(data,p01);
         const v10 = readVelocity(data,p10);
         const v11 = readVelocity(data,p11);
-        const v55 = readVelocity(data, actor.position).scale(2);
+        const v55 = readVelocity(data, actor.position).mul(2);
         actor.updateVelocity([v00,v01,v10,v11,v55],[p00,p01,p10,p11],dt);
     }
 }
