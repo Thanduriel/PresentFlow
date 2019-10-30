@@ -471,7 +471,7 @@ const displayMaterial = new Material(baseVertexShader, shaders.displayShaderSour
 function initFramebuffers () {
     let simRes = getResolution(config.SIM_RESOLUTION);
     let dyeRes = getResolution(config.DYE_RESOLUTION);
-
+    console.log(dyeRes);
     const texType = ext.halfFloatTexType;
     const rgba    = ext.formatRGBA;
     const rg      = ext.formatRG;
@@ -693,7 +693,21 @@ function initMap(){
 
 const simRes = getResolution(config.SIM_RESOLUTION);
 const simToPixelRatio = new Vec2(simRes.width / config.MAP_SIZE_X, simRes.height / config.MAP_SIZE_Y);
-const present = new Actor(gl, new Vec2(50,50), new Vec2(500,210), 0);
+
+var world = planck.World({
+    gravity: planck.Vec2(0, 0)
+});
+// create borders
+var borders = world.createBody({
+    type: 'static',
+    position: planck.Vec2(0,0),
+});
+borders.createFixture({shape: planck.Edge(Vec2(config.MAP_SIZE_X, 0.0),Vec2(0.0, 0.0))});
+borders.createFixture({shape: planck.Edge(Vec2(0.0, 0.0),Vec2(0.0, config.MAP_SIZE_Y))});
+borders.createFixture({shape: planck.Edge(Vec2(config.MAP_SIZE_X, 0.0),Vec2(config.MAP_SIZE_X,config.MAP_SIZE_Y))});
+borders.createFixture({shape: planck.Edge(Vec2(0.0, config.MAP_SIZE_Y),Vec2(config.MAP_SIZE_X,config.MAP_SIZE_Y))});
+
+const present = new Actor(gl, world, new Vec2(50,50), new Vec2(500,210), 0);
 var actors = [present];
 
 updateKeywords();
@@ -720,28 +734,26 @@ function update () {
 
 // gameplay update
 function process(dt) {
+    world.step(dt);
     // retrieve velocity field
     let data = new Uint16Array(simRes.width * simRes.height * 2);
     gl.bindFramebuffer(gl.FRAMEBUFFER, velocity.write.fbo);
     gl.readPixels(0, 0, simRes.width, simRes.height, ext.formatRG.format, ext.halfFloatTexType, data);
     for(let i = 0; i < actors.length; ++i){
         let actor = actors[i];
-        let velocity = actor.velocity;
-        velocity.mul(dt);
-        actor.position.add(velocity);
-        actor.rotation += actor.angularVelocity * dt;
-        const rot = m2.rotation(actor.rotation);
+        const rot = m2.rotation(actor.body.getAngle());
         const offset = actor.size.clone().mul(0.5);
-        const p00 = Vec2.add(actor.position, m2.multiply(rot, new Vec2(-offset.x, -offset.y)));
-        const p01 = Vec2.add(actor.position, m2.multiply(rot, new Vec2(-offset.x, offset.y)));
-        const p10 = Vec2.add(actor.position, m2.multiply(rot, new Vec2(offset.x, -offset.y)));
-        const p11 = Vec2.add(actor.position, m2.multiply(rot, new Vec2(offset.x, offset.y)));
+        const pos = actor.body.getPosition();
+        const p00 = Vec2.add(pos, m2.multiply(rot, new Vec2(-offset.x, -offset.y)));
+        const p01 = Vec2.add(pos, m2.multiply(rot, new Vec2(-offset.x, offset.y)));
+        const p10 = Vec2.add(pos, m2.multiply(rot, new Vec2(offset.x, -offset.y)));
+        const p11 = Vec2.add(pos, m2.multiply(rot, new Vec2(offset.x, offset.y)));
         const v00 = readVelocity(data,p00);
         const v01 = readVelocity(data,p01);
         const v10 = readVelocity(data,p10);
         const v11 = readVelocity(data,p11);
-        const v55 = readVelocity(data, actor.position).mul(2);
-        actor.updateVelocity([v00,v01,v10,v11,v55],[p00,p01,p10,p11],dt);
+        const v55 = readVelocity(data, pos).mul(2);
+        actor.updateVelocity([v00,v01,v10,v11,v55],[p00,p01,p10,p11, pos]);
     }
 }
 
