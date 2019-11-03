@@ -23,7 +23,7 @@ SOFTWARE.
 */
 
 import * as shaders from './shaders.js'
-import {Actor, m2} from './actor.js'
+import {Actor, m2, StaticActor} from './actor.js'
 import {config} from './context.js'
 
 var Vec2 = planck.Vec2;
@@ -679,16 +679,17 @@ function initMap(){
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 0, 1, 1, 1, 1, 0]), gl.STATIC_DRAW);
 
     constructSolidProgram.bind();
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, solidVertexBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, Map1Vertices, gl.STATIC_DRAW);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, solids.fbo);
+    gl.enableVertexAttribArray(0);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, solidIndexBuffer);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, Map1Indicies, gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, solidVertexBuffer);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(0);
+
+    for(let i = 0; i < obstacles.length; ++i)
+        obstacles[i].writeToBuffer(gl);
     
-    gl.bindFramebuffer(gl.FRAMEBUFFER, solids.fbo);
-    gl.drawElements(gl.TRIANGLES, 3, gl.UNSIGNED_SHORT, 0); 
+//   gl.drawElements(gl.TRIANGLES, 3, gl.UNSIGNED_SHORT, 0); 
 }
 
 const simRes = getResolution(config.SIM_RESOLUTION);
@@ -709,6 +710,8 @@ borders.createFixture({shape: planck.Edge(Vec2(0.0, config.MAP_SIZE_Y),Vec2(conf
 
 const present = new Actor(gl, world, new Vec2(50,50), new Vec2(500,210), 0);
 var actors = [present];
+const obstacle = new StaticActor(world,[Vec2(512, 256), Vec2(256, 128), Vec2(512, 128)]);
+var obstacles = [obstacle];
 
 updateKeywords();
 initFramebuffers();

@@ -131,7 +131,7 @@ export class Actor {
     computeTransformation(){
         const pos = this.body.getPosition();
         var translation = m3.translation(pos.x, pos.y);
-        var rotation    = m3.rotation(this.body.getAngle());
+        var rotation    = m3.rotation(2 * 3.1415 - this.body.getAngle());
         var scale       = m3.scaling(this.size.x * 0.5, 
             this.size.y * 0.5);
         
@@ -187,4 +187,26 @@ function generatePresentTex(size){
     }
     
     return buf;
+}
+
+export class StaticActor{
+    constructor(world, vertices){
+        this.vertices = vertices;
+        this.body = world.createBody({
+            type: 'static',
+            position: planck.Vec2(0,0),
+        });
+        this.body.createFixture(planck.Polygon(vertices));
+    }
+
+    writeToBuffer(gl){
+        let buf = new Float32Array(this.vertices.length*2);
+        for(let i = 0; i < this.vertices.length; ++i){
+            const v = toScreenSpace(this.vertices[i]);
+            buf[i*2] = v.x;
+            buf[i*2+1] = v.y;
+        }
+        gl.bufferData(gl.ARRAY_BUFFER, buf, gl.STATIC_DRAW);
+        gl.drawElements(gl.TRIANGLES, 3, gl.UNSIGNED_SHORT, 0); 
+    }
 }
