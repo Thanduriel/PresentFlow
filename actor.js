@@ -1,6 +1,7 @@
 "use strict";
 
 import {config, ASPECT_RATIO} from './context.js'
+import { splatShaderSrc } from './shaders.js';
 
 var Vec2 = planck.Vec2;
 
@@ -207,6 +208,18 @@ export class StaticActor{
             buf[i*2+1] = v.y;
         }
         gl.bufferData(gl.ARRAY_BUFFER, buf, gl.STATIC_DRAW);
-        gl.drawElements(gl.TRIANGLES, 3, gl.UNSIGNED_SHORT, 0); 
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, this.vertices.length); 
+    }
+}
+
+export class Flow{
+    constructor(posBegin, posEnd, force, color, radius){
+        this.direction = posEnd.sub(posBegin);
+        posBegin.x /= config.MAP_SIZE_X;
+        posBegin.y /= config.MAP_SIZE_Y;
+        this.positionBegin = posBegin;
+        this.force = force;
+        this.color = color;
+        this.radius = radius;
     }
 }

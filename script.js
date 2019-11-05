@@ -23,7 +23,7 @@ SOFTWARE.
 */
 
 import * as shaders from './shaders.js'
-import {Actor, m2, StaticActor} from './actor.js'
+import {Actor, m2, StaticActor, Flow} from './actor.js'
 import {config} from './context.js'
 
 var Vec2 = planck.Vec2;
@@ -654,11 +654,7 @@ function updateKeywords () {
     displayMaterial.setKeywords(displayKeywords);
 }
 
-const Map1Vertices = new Float32Array([0, 0.25, -0.25, -0.25, 0.25, -0.25]);
-const Map1Indicies = new Uint16Array([0, 1, 2]);
-
 const solidVertexBuffer = gl.createBuffer();
-const solidIndexBuffer = gl.createBuffer();
 const texCoordBuffer = gl.createBuffer();
 
 function drawBuffer(vertexBuffer, indexBuffer, destination) {
@@ -681,15 +677,11 @@ function initMap(){
     constructSolidProgram.bind();
     gl.bindFramebuffer(gl.FRAMEBUFFER, solids.fbo);
     gl.enableVertexAttribArray(0);
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, solidIndexBuffer);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, Map1Indicies, gl.STATIC_DRAW);
     gl.bindBuffer(gl.ARRAY_BUFFER, solidVertexBuffer);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
 
     for(let i = 0; i < obstacles.length; ++i)
         obstacles[i].writeToBuffer(gl);
-    
-//   gl.drawElements(gl.TRIANGLES, 3, gl.UNSIGNED_SHORT, 0); 
 }
 
 const simRes = getResolution(config.SIM_RESOLUTION);
@@ -710,8 +702,11 @@ borders.createFixture({shape: planck.Edge(Vec2(0.0, config.MAP_SIZE_Y),Vec2(conf
 
 const present = new Actor(gl, world, new Vec2(50,50), new Vec2(500,210), 0);
 var actors = [present];
-const obstacle = new StaticActor(world,[Vec2(512, 256), Vec2(256, 128), Vec2(512, 128)]);
-var obstacles = [obstacle];
+const obstacle1 = new StaticActor(world,[Vec2(256, 256), Vec2(512, 256), Vec2(256, 512), Vec2(512,512)]);
+const obstacle2 = new StaticActor(world,[Vec2(600, 256), Vec2(800, 256), Vec2(600, 512), Vec2(800,512)]);
+var obstacles = [obstacle1, obstacle2];
+const flow01 = new Flow(Vec2(560, 256), Vec2(560, 512), 42.0, {r:0,g:0,b:220}, 1000.0);
+let flows = [flow01];
 
 updateKeywords();
 initFramebuffers();
@@ -738,10 +733,13 @@ function update () {
 // gameplay update
 function process(dt) {
     world.step(dt);
+    
     // retrieve velocity field
     let data = new Uint16Array(simRes.width * simRes.height * 2);
     gl.bindFramebuffer(gl.FRAMEBUFFER, velocity.write.fbo);
     gl.readPixels(0, 0, simRes.width, simRes.height, ext.formatRG.format, ext.halfFloatTexType, data);
+    
+    // update dynamic actors
     for(let i = 0; i < actors.length; ++i){
         let actor = actors[i];
         const rot = m2.rotation(actor.body.getAngle());
@@ -757,6 +755,13 @@ function process(dt) {
         const v11 = readVelocity(data,p11);
         const v55 = readVelocity(data, pos).mul(2);
         actor.updateVelocity([v00,v01,v10,v11,v55],[p00,p01,p10,p11, pos]);
+    }
+
+    // update flows
+    for(let i = 0; i < flows.length; ++i){
+        let flow = flows[i];
+//        splat(flow.positionBegin.x, flow.positionBegin.y, 
+//            flow.direction.x, flow.direction.y, generateColor()); //flow.color, 10.0, flow.force * dt
     }
 }
 
@@ -1053,14 +1058,18 @@ function multipleSplats (amount) {
     }
 }
 
-function splat (x, y, dx, dy, color) {
+function splat (x, y, dx, dy, color, radius = correctRadius(config.SPLAT_RADIUS / 100.0),force = 1.0) {
+    console.log(x);
+    console.log(dx);
+
     gl.viewport(0, 0, velocity.width, velocity.height);
     splatProgram.bind();
     gl.uniform1i(splatProgram.uniforms.uTarget, velocity.read.attach(0));
     gl.uniform1f(splatProgram.uniforms.aspectRatio, canvas.width / canvas.height);
     gl.uniform2f(splatProgram.uniforms.point, x, y);
     gl.uniform3f(splatProgram.uniforms.color, dx, dy, 0.0);
-    gl.uniform1f(splatProgram.uniforms.radius, correctRadius(config.SPLAT_RADIUS / 100.0));
+    gl.uniform1f(splatProgram.uniforms.radius, radius);
+    gl.uniform1f(splatProgram.uniforms.force, force);
     blit(velocity.write.fbo);
     velocity.swap();
 
