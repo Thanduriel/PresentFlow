@@ -12,15 +12,13 @@
         <link rel="apple-touch-icon" href="logo.png">
         <link rel="icon" href="logo.png">
 
-        <title>WebGL Fluid Simulation</title>
-        <meta name="description" content="A WebGL fluid simulation that works in mobile browsers.">
+        <title>PresentFlow</title>
+        <meta name="description" content="Acagamics advent Calendar game based on a WebGL fluid simulation.">
 
         <meta property="og:type" content="website">
-        <meta property="og:title" content="Webgl Fluid Simulation">
-        <meta property="og:description" content="A WebGL fluid simulation that works in mobile browsers.">
-        <meta property="og:url" content="https://paveldogreat.github.io/WebGL-Fluid-Simulation/">
-        <meta property="og:image" content="https://paveldogreat.github.io/WebGL-Fluid-Simulation/logo.png">
-
+        <meta property="og:title" content="PresentFlow">
+        <meta property="og:description" content="Acagamics advent Calendar game based on a WebGL fluid simulation.">
+    
         <script type="text/javascript" src="dat.gui.min.js"></script>
         <style>
             * {
@@ -29,7 +27,7 @@
 
             html, body {
                 overflow: hidden;
-                background-color: #000;
+                background-color: rgb(56, 255, 189);
             }
 
             body {
@@ -107,7 +105,7 @@
         </script>
     </head>
     <body>
-        <canvas></canvas>
+        <canvas oncontextmenu="return false;"></canvas>
         <script src="node_modules/planck-js/dist/planck.min.js"></script>
         <script src="./script.js" type="module"></script>
     </body>

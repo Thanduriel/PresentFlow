@@ -23,7 +23,7 @@ SOFTWARE.
 */
 
 import * as shaders from './shaders.js'
-import {Actor, m2, StaticActor, Flow} from './actor.js'
+import {Actor, m2, StaticActor, Flow, StaticActorDef, PresentDef} from './actor.js'
 import {config} from './context.js'
 
 var Vec2 = planck.Vec2;
@@ -48,6 +48,7 @@ function pointerPrototype () {
 
 let pointers = [];
 let splatStack = [];
+let buildStack = [];
 pointers.push(new pointerPrototype());
 
 const { gl, ext } = getWebGLContext(canvas);
@@ -184,46 +185,6 @@ function startGUI () {
     captureFolder.addColor(config, 'BACK_COLOR').name('background color');
     captureFolder.add(config, 'TRANSPARENT').name('transparent');
     captureFolder.add({ fun: captureScreenshot }, 'fun').name('take screenshot');
-
-    let github = gui.add({ fun : () => {
-        window.open('https://github.com/PavelDoGreat/WebGL-Fluid-Simulation');
-        ga('send', 'event', 'link button', 'github');
-    } }, 'fun').name('Github');
-    github.__li.className = 'cr function bigFont';
-    github.__li.style.borderLeft = '3px solid #8C8C8C';
-    let githubIcon = document.createElement('span');
-    github.domElement.parentElement.appendChild(githubIcon);
-    githubIcon.className = 'icon github';
-
-    let twitter = gui.add({ fun : () => {
-        ga('send', 'event', 'link button', 'twitter');
-        window.open('https://twitter.com/PavelDoGreat');
-    } }, 'fun').name('Twitter');
-    twitter.__li.className = 'cr function bigFont';
-    twitter.__li.style.borderLeft = '3px solid #8C8C8C';
-    let twitterIcon = document.createElement('span');
-    twitter.domElement.parentElement.appendChild(twitterIcon);
-    twitterIcon.className = 'icon twitter';
-
-    let discord = gui.add({ fun : () => {
-        ga('send', 'event', 'link button', 'discord');
-        window.open('https://discordapp.com/invite/CeqZDDE');
-    } }, 'fun').name('Discord');
-    discord.__li.className = 'cr function bigFont';
-    discord.__li.style.borderLeft = '3px solid #8C8C8C';
-    let discordIcon = document.createElement('span');
-    discord.domElement.parentElement.appendChild(discordIcon);
-    discordIcon.className = 'icon discord';
-
-    let app = gui.add({ fun : () => {
-        ga('send', 'event', 'link button', 'app');
-        window.open('http://onelink.to/5b58bn');
-    } }, 'fun').name('Check out mobile app');
-    app.__li.className = 'cr function appBigFont';
-    app.__li.style.borderLeft = '3px solid #00FF7F';
-    let appIcon = document.createElement('span');
-    app.domElement.parentElement.appendChild(appIcon);
-    appIcon.className = 'icon app';
 
     if (isMobile())
         gui.close();
@@ -666,8 +627,22 @@ function drawBuffer(vertexBuffer, indexBuffer, destination) {
     gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
 }
 
+function buildObstacle(vertices){
+    let obstacle = new StaticActor(world, vertices);
+    obstacles.push(obstacle);
+
+    gl.viewport(0, 0, velocity.width, velocity.height);
+    constructSolidProgram.bind();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, solids.fbo);
+    gl.enableVertexAttribArray(0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, solidVertexBuffer);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+    obstacle.writeToBuffer(gl);
+}
 
 function initMap(){
+    // write static obstacles
     gl.disable(gl.BLEND);
     gl.viewport(0, 0, velocity.width, velocity.height);
 
@@ -682,6 +657,30 @@ function initMap(){
 
     for(let i = 0; i < obstacles.length; ++i)
         obstacles[i].writeToBuffer(gl);
+
+    // create goals
+    world.on('post-solve', function(contact) {
+        var fA = contact.getFixtureA(), bA = fA.getBody();
+        var fB = contact.getFixtureB(), bB = fB.getBody();
+    
+        var obstacle = fA.getUserData() === StaticActorDef.userData && bA || fB.getUserData() === StaticActorDef.userData && bB;
+        var present = fA.getUserData() === PresentDef.userData && bA || fB.getUserData() === PresentDef.userData && bB;
+
+        // do not change world immediately
+        setTimeout(function() {
+            if (obstacle && present){
+                let staticActor = obstacle.getUserData();
+                if(staticActor.expectedPresents > 0){
+                    world.destroyBody(present);
+                    for( var i = 0; i < actors.length; i++)
+                        if ( actors[i].body === present){
+                            actors.splice(i, 1); 
+                            break;
+                        }
+                }
+            }
+        }, 1);
+      });
 }
 
 const simRes = getResolution(config.SIM_RESOLUTION);
@@ -705,13 +704,12 @@ var actors = [present];
 const obstacle1 = new StaticActor(world,[Vec2(256, 256), Vec2(512, 256), Vec2(256, 512), Vec2(512,512)]);
 const obstacle2 = new StaticActor(world,[Vec2(600, 256), Vec2(800, 256), Vec2(600, 512), Vec2(800,512)]);
 var obstacles = [obstacle1, obstacle2];
-const flow01 = new Flow(Vec2(560, 256), Vec2(560, 512), 42.0, {r:0,g:0,b:220}, 1000.0);
+const flow01 = new Flow(Vec2(556, 256), Vec2(556, 512), 10.0, {r:0,g:0,b:0.5}, 1.0);
 let flows = [flow01];
 
 updateKeywords();
 initFramebuffers();
 initMap();
-// multipleSplats(parseInt(Math.random() * 20) + 5);
 
 let lastUpdateTime = Date.now();
 let colorUpdateTimer = 0.0;
@@ -743,7 +741,7 @@ function process(dt) {
     for(let i = 0; i < actors.length; ++i){
         let actor = actors[i];
         const rot = m2.rotation(actor.body.getAngle());
-        const offset = actor.size.clone().mul(0.5);
+        const offset = actor.size.clone().mul(0.4);
         const pos = actor.body.getPosition();
         const p00 = Vec2.add(pos, m2.multiply(rot, new Vec2(-offset.x, -offset.y)));
         const p01 = Vec2.add(pos, m2.multiply(rot, new Vec2(-offset.x, offset.y)));
@@ -753,15 +751,15 @@ function process(dt) {
         const v01 = readVelocity(data,p01);
         const v10 = readVelocity(data,p10);
         const v11 = readVelocity(data,p11);
-        const v55 = readVelocity(data, pos).mul(2);
-        actor.updateVelocity([v00,v01,v10,v11,v55],[p00,p01,p10,p11, pos]);
+    //    const v55 = readVelocity(data, pos).mul(2);
+        actor.updateVelocity([v00,v01,v10,v11],[p00,p01,p10,p11]);
     }
 
     // update flows
     for(let i = 0; i < flows.length; ++i){
         let flow = flows[i];
-//        splat(flow.positionBegin.x, flow.positionBegin.y, 
-//            flow.direction.x, flow.direction.y, generateColor()); //flow.color, 10.0, flow.force * dt
+        splat(flow.positionBegin.x, flow.positionBegin.y, 
+            flow.direction.x, flow.direction.y, flow.color, flow.radius, dt * flow.force); //flow.color, 10.0, flow.force * dt
     }
 }
 
@@ -1059,8 +1057,6 @@ function multipleSplats (amount) {
 }
 
 function splat (x, y, dx, dy, color, radius = correctRadius(config.SPLAT_RADIUS / 100.0),force = 1.0) {
-    console.log(x);
-    console.log(dx);
 
     gl.viewport(0, 0, velocity.width, velocity.height);
     splatProgram.bind();
@@ -1104,8 +1100,14 @@ canvas.addEventListener('mousemove', e => {
     updatePointerMoveData(pointer, posX, posY);
 });
 
-window.addEventListener('mouseup', () => {
+window.addEventListener('mouseup', e => {
     updatePointerUpData(pointers[0]);
+    // left mouse add points, right mouse finish
+    if(e.button == 0) buildStack.push(Vec2(e.x, canvas.height-e.y));
+    else if(e.button == 2){
+            buildObstacle(buildStack);
+            buildStack = [];
+    }
 });
 
 canvas.addEventListener('touchstart', e => {

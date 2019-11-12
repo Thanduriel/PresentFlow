@@ -444,6 +444,8 @@ export const pressureShaderSrc = `
         float C = texture2D(uPressure, vUv).x;
         float divergence = texture2D(uDivergence, vUv).x;
         float pressure = (L + R + B + T - divergence) * 0.25;
+        float scale = 1.0;
+        if(vUv.y > 0.95) scale = 0.0;//-= (vUv.y - 0.95) * 20.0;
         gl_FragColor = vec4(pressure, 0.0, 0.0, 1.0);
     }
 `;

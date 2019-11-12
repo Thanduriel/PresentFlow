@@ -104,6 +104,12 @@ let m3 = {
 
 };
 
+export const PresentDef = {
+    density: 1.0,
+    friction: 0.3,
+    userData: "Present"
+}
+
 export class Actor {
     constructor (gl, world, size, position, rotation) {
         this.size = size;
@@ -113,11 +119,7 @@ export class Actor {
             position: position,
             linearVelocity: Vec2(-100.01,0.0)
         });
-        this.body.createFixture({
-            shape: planck.Box(size.x*0.5, size.y*0.5, Vec2(0.5,0.5)),
-            density: 1.0,
-            friction: 0.3,
-        });
+        this.body.createFixture(planck.Box(size.x*0.5, size.y*0.5, Vec2(0.5,0.5)), PresentDef);
 
         // create texture
         this.texture = gl.createTexture();
@@ -146,7 +148,7 @@ export class Actor {
 
     updateVelocity(velocities, positions){
         for (let i = 0; i < velocities.length; ++i) {
-            this.body.applyForce(velocities[i].mul(400), positions[i], true);
+            this.body.applyForce(velocities[i].mul(1600), positions[i], true);
         }
     }
 
@@ -165,10 +167,12 @@ function generatePresentTex(size){
         buf[i+3] = 255;
     }
 
+    let halfSize = size.x / 2.0;
+    const ribbonHalf = size.x * presentParams.RIBBON_HALF_RATIO;
     // horizontal ribbon
     for (let ix = 0; ix < size.x; ++ix) {
-        const min = size.y * (0.5 - presentParams.RIBBON_HALF_RATIO);
-        const max = size.y * (0.5 + presentParams.RIBBON_HALF_RATIO);
+        const min = halfSize - ribbonHalf;
+        const max = halfSize + ribbonHalf;
         for (let iy = min; iy < max; ++iy) {
             const ind = ix * 4 + iy * size.x * 4;
             buf[ind] = 255;
@@ -177,9 +181,11 @@ function generatePresentTex(size){
     }
 
     // vertical ribbon
+    halfSize = size.y / 2.0;
+
     for (let iy = 0; iy < size.y; ++iy) {
-        const min = size.x * (0.5 - presentParams.RIBBON_HALF_RATIO);
-        const max = size.x * (0.5 + presentParams.RIBBON_HALF_RATIO);
+        const min = halfSize - ribbonHalf;
+        const max = halfSize + ribbonHalf;
         for (let ix = min; ix < max; ++ix) {
             const ind = ix * 4 + iy * size.x * 4;
             buf[ind] = 255;
@@ -190,14 +196,22 @@ function generatePresentTex(size){
     return buf;
 }
 
+export const StaticActorDef = {
+    friction: 0.1,
+    restitution: 0.1,
+    userData: 'StaticActor'
+  };
+
 export class StaticActor{
     constructor(world, vertices){
         this.vertices = vertices;
+        this.expectedPresents = 0;
         this.body = world.createBody({
             type: 'static',
             position: planck.Vec2(0,0),
+            userData: this
         });
-        this.body.createFixture(planck.Polygon(vertices));
+        this.body.createFixture(planck.Polygon(vertices), StaticActorDef);
     }
 
     writeToBuffer(gl){
@@ -220,6 +234,6 @@ export class Flow{
         this.positionBegin = posBegin;
         this.force = force;
         this.color = color;
-        this.radius = radius;
+        this.radius = radius / config.MAP_SIZE_Y;
     }
 }
