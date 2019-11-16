@@ -635,10 +635,10 @@ function buildObstacle(vertices){
     constructSolidProgram.bind();
     gl.bindFramebuffer(gl.FRAMEBUFFER, solids.fbo);
     gl.enableVertexAttribArray(0);
-    gl.bindBuffer(gl.ARRAY_BUFFER, solidVertexBuffer);
+//    gl.bindBuffer(gl.ARRAY_BUFFER, solidVertexBuffer);
+    obstacle.createBuffer(gl);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-
-    obstacle.writeToBuffer(gl);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, obstacle.vertices.length); 
 }
 
 function initMap(){
@@ -646,17 +646,20 @@ function initMap(){
     gl.disable(gl.BLEND);
     gl.viewport(0, 0, velocity.width, velocity.height);
 
+    // coordinates for texture rendering
     gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 0, 1, 1, 1, 1, 0]), gl.STATIC_DRAW);
 
     constructSolidProgram.bind();
     gl.bindFramebuffer(gl.FRAMEBUFFER, solids.fbo);
     gl.enableVertexAttribArray(0);
-    gl.bindBuffer(gl.ARRAY_BUFFER, solidVertexBuffer);
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+//    gl.bindBuffer(gl.ARRAY_BUFFER, solidVertexBuffer);
 
-    for(let i = 0; i < obstacles.length; ++i)
-        obstacles[i].writeToBuffer(gl);
+    for(let i = 0; i < obstacles.length; ++i){
+        obstacles[i].createBuffer(gl);
+        gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, obstacles[i].vertices.length); 
+    }
 
     // create goals
     world.on('post-solve', function(contact) {
@@ -741,7 +744,7 @@ function process(dt) {
     for(let i = 0; i < actors.length; ++i){
         let actor = actors[i];
         const rot = m2.rotation(actor.body.getAngle());
-        const offset = actor.size.clone().mul(0.4);
+        const offset = actor.size.clone().mul(0.5);
         const pos = actor.body.getPosition();
         const p00 = Vec2.add(pos, m2.multiply(rot, new Vec2(-offset.x, -offset.y)));
         const p01 = Vec2.add(pos, m2.multiply(rot, new Vec2(-offset.x, offset.y)));
@@ -751,8 +754,8 @@ function process(dt) {
         const v01 = readVelocity(data,p01);
         const v10 = readVelocity(data,p10);
         const v11 = readVelocity(data,p11);
-    //    const v55 = readVelocity(data, pos).mul(2);
-        actor.updateVelocity([v00,v01,v10,v11],[p00,p01,p10,p11]);
+        const v55 = readVelocity(data, pos).mul(4);
+        actor.updateVelocity([v00,v01,v10,v11,v55],[p00,p01,p10,p11,pos]);
     }
 
     // update flows
@@ -905,6 +908,7 @@ function render (target) {
         drawColor(fbo, normalizeColor(config.BACK_COLOR));
     if (target == null && config.TRANSPARENT)
         drawCheckerboard(fbo);
+    drawObstacles(fbo);
     drawDisplay(fbo, width, height);
     drawActors(fbo, actors);
 }
@@ -957,6 +961,18 @@ function drawActors(fbo, actors){
         gl.uniform1i(textureProgram.uniforms.uTexture, 0);
         gl.uniformMatrix3fv(textureProgram.uniforms.uMatrix, false, actors[i].computeTransformation());
         gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
+    }
+}
+
+function drawObstacles(fbo){
+    checkerboardProgram.bind();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.uniform1f(checkerboardProgram.uniforms.aspectRatio, canvas.width / canvas.height);
+
+    for(let i = 0; i < obstacles.length; ++i){
+        gl.bindBuffer(gl.ARRAY_BUFFER, obstacles[i].buffer);
+        gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, obstacles[i].vertices.length); 
     }
 }
 
@@ -1084,12 +1100,15 @@ function correctRadius (radius) {
 }
 
 canvas.addEventListener('mousedown', e => {
-    let posX = scaleByPixelRatio(e.offsetX);
-    let posY = scaleByPixelRatio(e.offsetY);
-    let pointer = pointers.find(p => p.id == -1);
-    if (pointer == null)
-        pointer = new pointerPrototype();
-    updatePointerDownData(pointer, -1, posX, posY);
+    if(e.button == 0) buildStack.push(Vec2(e.x, canvas.height-e.y));
+    else{
+        let posX = scaleByPixelRatio(e.offsetX);
+        let posY = scaleByPixelRatio(e.offsetY);
+        let pointer = pointers.find(p => p.id == -1);
+        if (pointer == null)
+            pointer = new pointerPrototype();
+        updatePointerDownData(pointer, -1, posX, posY);
+    }
 });
 
 canvas.addEventListener('mousemove', e => {
@@ -1102,12 +1121,23 @@ canvas.addEventListener('mousemove', e => {
 
 window.addEventListener('mouseup', e => {
     updatePointerUpData(pointers[0]);
-    // left mouse add points, right mouse finish
-    if(e.button == 0) buildStack.push(Vec2(e.x, canvas.height-e.y));
-    else if(e.button == 2){
+
+    if(e.button == 0) {
+        const begin = buildStack[0];
+        let end = Vec2(e.x, canvas.height-e.y);
+        const dir = Vec2.sub(begin, end);
+        let offset = Vec2(-dir.y, dir.x);
+        offset.normalize();
+        offset.mul(config.OBSTACLE_HALF_WIDTH);
+
+        buildStack = [Vec2.add(begin,offset), Vec2.sub(begin,offset), Vec2.add(end,offset), Vec2.sub(end,offset)];
+        buildObstacle(buildStack);
+        buildStack = [];
+    }
+/*    else if(e.button == 2){
             buildObstacle(buildStack);
             buildStack = [];
-    }
+    }*/
 });
 
 canvas.addEventListener('touchstart', e => {

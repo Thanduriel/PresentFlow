@@ -148,7 +148,7 @@ export class Actor {
 
     updateVelocity(velocities, positions){
         for (let i = 0; i < velocities.length; ++i) {
-            this.body.applyForce(velocities[i].mul(1600), positions[i], true);
+            this.body.applyForce(velocities[i].mul(500), positions[i], true);
         }
     }
 
@@ -214,15 +214,16 @@ export class StaticActor{
         this.body.createFixture(planck.Polygon(vertices), StaticActorDef);
     }
 
-    writeToBuffer(gl){
+    createBuffer(gl){
         let buf = new Float32Array(this.vertices.length*2);
         for(let i = 0; i < this.vertices.length; ++i){
             const v = toScreenSpace(this.vertices[i]);
             buf[i*2] = v.x;
             buf[i*2+1] = v.y;
         }
+        this.buffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
         gl.bufferData(gl.ARRAY_BUFFER, buf, gl.STATIC_DRAW);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, this.vertices.length); 
     }
 }
 
