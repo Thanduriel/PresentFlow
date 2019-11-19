@@ -202,6 +202,15 @@ export const StaticActorDef = {
     userData: 'StaticActor'
   };
 
+export function createRectangleVertices(begin, end){
+    const dir = Vec2.sub(begin, end);
+    let offset = Vec2(-dir.y, dir.x);
+    offset.normalize();
+    offset.mul(config.OBSTACLE_HALF_WIDTH);
+
+    return [Vec2.add(begin,offset), Vec2.sub(begin,offset), Vec2.add(end,offset), Vec2.sub(end,offset)];
+}
+
 export class StaticActor{
     constructor(world, vertices){
         this.vertices = vertices;

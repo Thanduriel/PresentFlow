@@ -102,7 +102,7 @@ export const checkerboardShaderSrc = `
     void main () {
         vec2 uv = floor(vUv * SCALE * vec2(aspectRatio, 1.0));
         float v = mod(uv.x + uv.y, 2.0);
-        v = v * 0.01 + 0.1;
+        v = v * 0.05 + 0.1;
         gl_FragColor = vec4(vec3(v), 1.0);
     }
 `;

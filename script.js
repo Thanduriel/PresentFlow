@@ -23,7 +23,7 @@ SOFTWARE.
 */
 
 import * as shaders from './shaders.js'
-import {Actor, m2, StaticActor, Flow, StaticActorDef, PresentDef} from './actor.js'
+import {Actor, m2, StaticActor, Flow, StaticActorDef, PresentDef, createRectangleVertices} from './actor.js'
 import {config} from './context.js'
 
 var Vec2 = planck.Vec2;
@@ -49,6 +49,7 @@ function pointerPrototype () {
 let pointers = [];
 let splatStack = [];
 let buildStack = [];
+let previewObstacle = null;
 pointers.push(new pointerPrototype());
 
 const { gl, ext } = getWebGLContext(canvas);
@@ -627,18 +628,23 @@ function drawBuffer(vertexBuffer, indexBuffer, destination) {
     gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
 }
 
-function buildObstacle(vertices){
+function buildObstacle(vertices, enablePhysics=true){
     let obstacle = new StaticActor(world, vertices);
     obstacles.push(obstacle);
 
     gl.viewport(0, 0, velocity.width, velocity.height);
-    constructSolidProgram.bind();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, solids.fbo);
-    gl.enableVertexAttribArray(0);
-//    gl.bindBuffer(gl.ARRAY_BUFFER, solidVertexBuffer);
-    obstacle.createBuffer(gl);
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, obstacle.vertices.length); 
+	obstacle.createBuffer(gl);
+
+	if(enablePhysics){
+		constructSolidProgram.bind();
+		gl.bindFramebuffer(gl.FRAMEBUFFER, solids.fbo);
+		gl.enableVertexAttribArray(0);
+	//    gl.bindBuffer(gl.ARRAY_BUFFER, solidVertexBuffer);
+		gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+		gl.drawArrays(gl.TRIANGLE_STRIP, 0, obstacle.vertices.length); 
+	}
+
+	return obstacle;
 }
 
 function initMap(){
@@ -1100,8 +1106,9 @@ function correctRadius (radius) {
 }
 
 canvas.addEventListener('mousedown', e => {
-    if(e.button == 0) buildStack.push(Vec2(e.x, canvas.height-e.y));
-    else{
+	// start new obstacle
+    if(e.button === 0) buildStack.push(Vec2(e.x, canvas.height-e.y));
+    else {
         let posX = scaleByPixelRatio(e.offsetX);
         let posY = scaleByPixelRatio(e.offsetY);
         let pointer = pointers.find(p => p.id == -1);
@@ -1112,32 +1119,47 @@ canvas.addEventListener('mousedown', e => {
 });
 
 canvas.addEventListener('mousemove', e => {
+	if(buildStack.length > 0){
+		const begin = buildStack[0];
+		const end = Vec2(e.x, canvas.height-e.y);
+		if(previewObstacle != null) obstacles.pop();
+		previewObstacle = buildObstacle(createRectangleVertices(begin,end), false);
+	}
     let pointer = pointers[0];
     if (!pointer.down) return;
     let posX = scaleByPixelRatio(e.offsetX);
     let posY = scaleByPixelRatio(e.offsetY);
-    updatePointerMoveData(pointer, posX, posY);
+	updatePointerMoveData(pointer, posX, posY);
 });
 
-window.addEventListener('mouseup', e => {
+canvas.addEventListener('mouseup', e => {
     updatePointerUpData(pointers[0]);
-
-    if(e.button == 0) {
+    if(e.button == 0 && buildStack.length) {
+		if(previewObstacle != null) {
+			previewObstacle = null;
+			obstacles.pop();
+		}
         const begin = buildStack[0];
-        let end = Vec2(e.x, canvas.height-e.y);
-        const dir = Vec2.sub(begin, end);
-        let offset = Vec2(-dir.y, dir.x);
-        offset.normalize();
-        offset.mul(config.OBSTACLE_HALF_WIDTH);
+		const end = Vec2(e.x, canvas.height-e.y);
+		buildStack = [];
 
-        buildStack = [Vec2.add(begin,offset), Vec2.sub(begin,offset), Vec2.add(end,offset), Vec2.sub(end,offset)];
-        buildObstacle(buildStack);
-        buildStack = [];
+		// do not allow very small obstacles
+		if(Vec2.sub(begin,end).length() < 20)
+			return;
+        
+        buildObstacle(createRectangleVertices(begin,end));
     }
-/*    else if(e.button == 2){
-            buildObstacle(buildStack);
-            buildStack = [];
-    }*/
+});
+
+window.addEventListener('keydown', e=> {
+	if(e.keyCode == 27 && buildStack.length){
+		// reset current obstacle
+		buildStack = [];
+		if(previewObstacle != null){
+			obstacles.pop();
+			previewObstacle = null;
+		}
+	}
 });
 
 canvas.addEventListener('touchstart', e => {
