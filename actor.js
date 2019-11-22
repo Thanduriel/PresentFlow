@@ -111,7 +111,7 @@ export const PresentDef = {
 }
 
 export class Actor {
-    constructor (gl, world, size, position, rotation) {
+    constructor (gl, world, size, position) {
         this.size = size;
         // create physics body
         this.body = world.createBody({
@@ -212,15 +212,18 @@ export function createRectangleVertices(begin, end){
 }
 
 export class StaticActor{
-    constructor(world, vertices){
+    constructor(vertices){
         this.vertices = vertices;
-        this.expectedPresents = 0;
+        this.expectedPresents = 1;
+    }
+
+    createBody(world){
         this.body = world.createBody({
             type: 'static',
             position: planck.Vec2(0,0),
             userData: this
         });
-        this.body.createFixture(planck.Polygon(vertices), StaticActorDef);
+        this.body.createFixture(planck.Polygon(this.vertices), StaticActorDef);
     }
 
     createBuffer(gl){

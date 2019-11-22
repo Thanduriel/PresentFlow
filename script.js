@@ -31,6 +31,7 @@ var Vec2 = planck.Vec2;
 'use strict';
 
 const canvas = document.getElementsByTagName('canvas')[0];
+const rootDiv = document.getElementsByTagName('div')[0];
 resizeCanvas();
 
 function pointerPrototype () {
@@ -616,7 +617,6 @@ function updateKeywords () {
     displayMaterial.setKeywords(displayKeywords);
 }
 
-const solidVertexBuffer = gl.createBuffer();
 const texCoordBuffer = gl.createBuffer();
 
 function drawBuffer(vertexBuffer, indexBuffer, destination) {
@@ -629,13 +629,14 @@ function drawBuffer(vertexBuffer, indexBuffer, destination) {
 }
 
 function buildObstacle(vertices, enablePhysics=true){
-    let obstacle = new StaticActor(world, vertices);
+    let obstacle = new StaticActor(vertices);
     obstacles.push(obstacle);
 
     gl.viewport(0, 0, velocity.width, velocity.height);
 	obstacle.createBuffer(gl);
 
 	if(enablePhysics){
+        obstacle.createBody(world);
 		constructSolidProgram.bind();
 		gl.bindFramebuffer(gl.FRAMEBUFFER, solids.fbo);
 		gl.enableVertexAttribArray(0);
@@ -647,9 +648,27 @@ function buildObstacle(vertices, enablePhysics=true){
 	return obstacle;
 }
 
+function receivePresent(staticActor, present){
+    staticActor.expectedPresents--;
+    if(staticActor.expectedPresents == 0)
+        staticActor.htmlCounter.parentNode.removeChild(staticActor.htmlCounter);    
+    else
+        staticActor.htmlCounter.innerHTML = staticActor.expectedPresents;
+
+    gl.viewport(0, 0, dye.width, dye.height);
+    colorProgram.bind();
+    gl.uniform4f(colorProgram.uniforms.color, 1.0, 0.2, 0.2, 0.5);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, dye.write.fbo);
+    gl.bindBuffer(gl.ARRAY_BUFFER, staticActor.buffer);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, staticActor.vertices.length); 
+    dye.swap();
+}
+
 function initMap(){
     // write static obstacles
-    gl.disable(gl.BLEND);
+    gl.enable(gl.BLEND);
     gl.viewport(0, 0, velocity.width, velocity.height);
 
     // coordinates for texture rendering
@@ -662,9 +681,32 @@ function initMap(){
 //    gl.bindBuffer(gl.ARRAY_BUFFER, solidVertexBuffer);
 
     for(let i = 0; i < obstacles.length; ++i){
-        obstacles[i].createBuffer(gl);
+        let obstacle = obstacles[i];
+        obstacle.createBuffer(gl);
+        obstacle.createBody(world);
         gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, obstacles[i].vertices.length); 
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, obstacle.vertices.length); 
+
+        if(obstacle.expectedPresents){
+            // compute avg position
+            let pos = Vec2(0,0);
+            for(let j = 0; j < obstacle.vertices.length; ++j)
+                pos.add(obstacle.vertices[j]);
+            pos.mul(1.0 / obstacle.vertices.length);
+
+            var h = document.createElement("div");
+        //    var t = document.createTextNode(obstacles[i].expectedPresents);
+        //    h.appendChild(t);
+            h.innerHTML = obstacles[i].expectedPresents;
+            h.style.position = "absolute";
+            h.style.left = pos.x - 15 * 0.5 + "px";
+            h.style.top = pos.y - 21 + "px";
+            h.style.fontSize = "42px";
+            h.style.zIndex = 1;
+            h.style.color = "rgb(56, 255, 189)";
+            rootDiv.appendChild(h);
+            obstacle.htmlCounter = h;
+        }
     }
 
     // create goals
@@ -680,6 +722,7 @@ function initMap(){
             if (obstacle && present){
                 let staticActor = obstacle.getUserData();
                 if(staticActor.expectedPresents > 0){
+                    receivePresent(staticActor, present);
                     world.destroyBody(present);
                     for( var i = 0; i < actors.length; i++)
                         if ( actors[i].body === present){
@@ -710,8 +753,8 @@ borders.createFixture({shape: planck.Edge(Vec2(0.0, config.MAP_SIZE_Y),Vec2(conf
 
 const present = new Actor(gl, world, new Vec2(50,50), new Vec2(500,210), 0);
 var actors = [present];
-const obstacle1 = new StaticActor(world,[Vec2(256, 256), Vec2(512, 256), Vec2(256, 512), Vec2(512,512)]);
-const obstacle2 = new StaticActor(world,[Vec2(600, 256), Vec2(800, 256), Vec2(600, 512), Vec2(800,512)]);
+const obstacle1 = new StaticActor([Vec2(256, 256), Vec2(512, 256), Vec2(256, 512), Vec2(512,512)]);
+const obstacle2 = new StaticActor([Vec2(600, 256), Vec2(800, 256), Vec2(600, 512), Vec2(800,512)]);
 var obstacles = [obstacle1, obstacle2];
 const flow01 = new Flow(Vec2(556, 256), Vec2(556, 512), 10.0, {r:0,g:0,b:0.5}, 1.0);
 let flows = [flow01];
@@ -1107,7 +1150,7 @@ function correctRadius (radius) {
 
 canvas.addEventListener('mousedown', e => {
 	// start new obstacle
-    if(e.button === 0) buildStack.push(Vec2(e.x, canvas.height-e.y));
+    if(e.button === 0) buildStack.push(Vec2(e.offsetX, canvas.height-e.offsetY));
     else {
         let posX = scaleByPixelRatio(e.offsetX);
         let posY = scaleByPixelRatio(e.offsetY);
@@ -1121,7 +1164,7 @@ canvas.addEventListener('mousedown', e => {
 canvas.addEventListener('mousemove', e => {
 	if(buildStack.length > 0){
 		const begin = buildStack[0];
-		const end = Vec2(e.x, canvas.height-e.y);
+		const end = Vec2(e.offsetX, canvas.height-e.offsetY);
 		if(previewObstacle != null) obstacles.pop();
 		previewObstacle = buildObstacle(createRectangleVertices(begin,end), false);
 	}
@@ -1140,10 +1183,10 @@ canvas.addEventListener('mouseup', e => {
 			obstacles.pop();
 		}
         const begin = buildStack[0];
-		const end = Vec2(e.x, canvas.height-e.y);
+		const end = Vec2(e.offsetX, canvas.height-e.offsetY);
 		buildStack = [];
 
-		// do not allow very small obstacles
+        // do not allow very small obstacles due to inconsistent physics
 		if(Vec2.sub(begin,end).length() < 20)
 			return;
         

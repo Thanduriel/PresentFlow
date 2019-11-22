@@ -31,13 +31,18 @@
             }
 
             body {
-                margin: 0;
                 position: fixed;
                 width: 100%;
                 height: 100%;
             }
 
             canvas {
+                display: block;
+                width: 1366px;
+                height: 768px;
+            }
+            div {
+                margin: auto;
                 width: 1366px;
                 height: 768px;
             }
@@ -105,7 +110,7 @@
         </script>
     </head>
     <body>
-        <canvas oncontextmenu="return false;"></canvas>
+        <div><canvas oncontextmenu="return false;"></canvas></div>
         <script src="node_modules/planck-js/dist/planck.min.js"></script>
         <script src="./script.js" type="module"></script>
     </body>
