@@ -215,6 +215,7 @@ export class StaticActor{
     constructor(vertices){
         this.vertices = vertices;
         this.expectedPresents = 1;
+        this.htmlCounter = null;
     }
 
     createBody(world){

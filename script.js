@@ -24,6 +24,7 @@ SOFTWARE.
 
 import * as shaders from './shaders.js'
 import {Actor, m2, StaticActor, Flow, StaticActorDef, PresentDef, createRectangleVertices} from './actor.js'
+import * as maps from './maps.js'
 import {config} from './context.js'
 
 var Vec2 = planck.Vec2;
@@ -650,8 +651,10 @@ function buildObstacle(vertices, enablePhysics=true){
 
 function receivePresent(staticActor, present){
     staticActor.expectedPresents--;
-    if(staticActor.expectedPresents == 0)
+    if(staticActor.expectedPresents == 0){
         staticActor.htmlCounter.parentNode.removeChild(staticActor.htmlCounter);    
+        staticActor.htmlCounter = null;
+    }
     else
         staticActor.htmlCounter.innerHTML = staticActor.expectedPresents;
 
@@ -666,7 +669,51 @@ function receivePresent(staticActor, present){
     dye.swap();
 }
 
-function initMap(){
+function resetBuffers(){
+    for(let i = 0; i < obstacles.length; ++i)
+        if(obstacles[i].htmlCounter != null)
+            rootDiv.removeChild(obstacles[i].htmlCounter);
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, velocity.write.fbo);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    velocity.swap();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, divergence.fbo);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, pressure.write.fbo);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    pressure.swap();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, curl.fbo);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, dye.write.fbo);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    dye.swap();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, solids.fbo);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+}
+
+function initMap(mapBuilder){
+    if(currentMap != null) resetBuffers();
+
+    currentMap = mapBuilder;
+
+    world = planck.World({
+        gravity: planck.Vec2(0, 0)
+    });
+    // create borders
+    var borders = world.createBody({
+        type: 'static',
+        position: planck.Vec2(0,0),
+    });
+    borders.createFixture({shape: planck.Edge(Vec2(config.MAP_SIZE_X, 0.0),Vec2(0.0, 0.0))});
+    borders.createFixture({shape: planck.Edge(Vec2(0.0, 0.0),Vec2(0.0, config.MAP_SIZE_Y))});
+    borders.createFixture({shape: planck.Edge(Vec2(config.MAP_SIZE_X, 0.0),Vec2(config.MAP_SIZE_X,config.MAP_SIZE_Y))});
+    borders.createFixture({shape: planck.Edge(Vec2(0.0, config.MAP_SIZE_Y),Vec2(config.MAP_SIZE_X,config.MAP_SIZE_Y))});
+    
+    let map = mapBuilder(gl, world);
+    actors = map.actors;
+    obstacles = map.obstacles;
+    flows = map.flows;
+
     // write static obstacles
     gl.enable(gl.BLEND);
     gl.viewport(0, 0, velocity.width, velocity.height);
@@ -695,8 +742,6 @@ function initMap(){
             pos.mul(1.0 / obstacle.vertices.length);
 
             var h = document.createElement("div");
-        //    var t = document.createTextNode(obstacles[i].expectedPresents);
-        //    h.appendChild(t);
             h.innerHTML = obstacles[i].expectedPresents;
             h.style.position = "absolute";
             h.style.left = pos.x - 15 * 0.5 + "px";
@@ -738,30 +783,15 @@ function initMap(){
 const simRes = getResolution(config.SIM_RESOLUTION);
 const simToPixelRatio = new Vec2(simRes.width / config.MAP_SIZE_X, simRes.height / config.MAP_SIZE_Y);
 
-var world = planck.World({
-    gravity: planck.Vec2(0, 0)
-});
-// create borders
-var borders = world.createBody({
-    type: 'static',
-    position: planck.Vec2(0,0),
-});
-borders.createFixture({shape: planck.Edge(Vec2(config.MAP_SIZE_X, 0.0),Vec2(0.0, 0.0))});
-borders.createFixture({shape: planck.Edge(Vec2(0.0, 0.0),Vec2(0.0, config.MAP_SIZE_Y))});
-borders.createFixture({shape: planck.Edge(Vec2(config.MAP_SIZE_X, 0.0),Vec2(config.MAP_SIZE_X,config.MAP_SIZE_Y))});
-borders.createFixture({shape: planck.Edge(Vec2(0.0, config.MAP_SIZE_Y),Vec2(config.MAP_SIZE_X,config.MAP_SIZE_Y))});
-
-const present = new Actor(gl, world, new Vec2(50,50), new Vec2(500,210), 0);
-var actors = [present];
-const obstacle1 = new StaticActor([Vec2(256, 256), Vec2(512, 256), Vec2(256, 512), Vec2(512,512)]);
-const obstacle2 = new StaticActor([Vec2(600, 256), Vec2(800, 256), Vec2(600, 512), Vec2(800,512)]);
-var obstacles = [obstacle1, obstacle2];
-const flow01 = new Flow(Vec2(556, 256), Vec2(556, 512), 10.0, {r:0,g:0,b:0.5}, 1.0);
-let flows = [flow01];
+let currentMap = null;
+let world = {};
+let actors = [];
+let obstacles = [];
+let flows = [];
 
 updateKeywords();
 initFramebuffers();
-initMap();
+initMap(maps.MAP_01);
 
 let lastUpdateTime = Date.now();
 let colorUpdateTimer = 0.0;
@@ -1195,6 +1225,7 @@ canvas.addEventListener('mouseup', e => {
 });
 
 window.addEventListener('keydown', e=> {
+    // esc
 	if(e.keyCode == 27 && buildStack.length){
 		// reset current obstacle
 		buildStack = [];
@@ -1202,7 +1233,9 @@ window.addEventListener('keydown', e=> {
 			obstacles.pop();
 			previewObstacle = null;
 		}
-	}
+	} else if(e.keyCode == 67){
+        initMap(maps.MAP_01);
+    }
 });
 
 canvas.addEventListener('touchstart', e => {
