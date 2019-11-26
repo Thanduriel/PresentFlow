@@ -1,7 +1,7 @@
 "use strict";
 
 import {config, ASPECT_RATIO} from './context.js'
-import { splatShaderSrc } from './shaders.js';
+import {HSVtoRGB} from './utils.js'
 
 var Vec2 = planck.Vec2;
 
@@ -117,15 +117,18 @@ export class Actor {
         this.body = world.createBody({
             type: 'dynamic',
             position: position,
-            linearVelocity: Vec2(-100.01,0.0)
+            linearVelocity: Vec2(-100.01,0.0),
+            userData : this
         });
         this.body.createFixture(planck.Box(size.x*0.5, size.y*0.5, Vec2(0.5,0.5)), PresentDef);
 
         // create texture
+        const [texture, color] = generatePresentTex(size);
+        this.color = color;
         this.texture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, this.texture);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, size.x, size.y, 0, gl.RGBA, gl.UNSIGNED_BYTE,
-            generatePresentTex(size));
+            texture);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -159,14 +162,19 @@ const presentParams = {
 }
 
 function generatePresentTex(size){
-    var buf = new Uint8Array(size.x * size.y * 4);
+    let buf = new Uint8Array(size.x * size.y * 4);
 
     // wrapping paper
+    const hue = Math.random();
+    const wrapColor = HSVtoRGB(hue, 1.0, 1.0);
     for (let i = 0; i < buf.length; i+=4) {
-        buf[i] = 255;
+        buf[i] = wrapColor.r * 255;  
+        buf[i+1] = wrapColor.g * 255;
+        buf[i+2] = wrapColor.b * 255;
         buf[i+3] = 255;
     }
 
+    const ribbonColor = HSVtoRGB(hue+0.5 % 1.0, 1.0, 1.0);
     let halfSize = size.x / 2.0;
     const ribbonHalf = size.x * presentParams.RIBBON_HALF_RATIO;
     // horizontal ribbon
@@ -175,12 +183,13 @@ function generatePresentTex(size){
         const max = halfSize + ribbonHalf;
         for (let iy = min; iy < max; ++iy) {
             const ind = ix * 4 + iy * size.x * 4;
-            buf[ind] = 255;
-            buf[ind+1] = 255;
+            buf[ind] = ribbonColor.r * 255;
+            buf[ind+1] = ribbonColor.g * 255;
+            buf[ind+2] = ribbonColor.b * 255;
         }
     }
 
-    // vertical ribbon
+    // vertical ribbon 
     halfSize = size.y / 2.0;
 
     for (let iy = 0; iy < size.y; ++iy) {
@@ -188,12 +197,13 @@ function generatePresentTex(size){
         const max = halfSize + ribbonHalf;
         for (let ix = min; ix < max; ++ix) {
             const ind = ix * 4 + iy * size.x * 4;
-            buf[ind] = 255;
-            buf[ind+1] = 255;
+            buf[ind] = ribbonColor.r * 255;
+            buf[ind+1] = ribbonColor.g * 255;
+            buf[ind+2] = ribbonColor.b * 255;
         }
     }
     
-    return buf;
+    return [buf,wrapColor];
 }
 
 export const StaticActorDef = {

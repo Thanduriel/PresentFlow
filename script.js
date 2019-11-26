@@ -24,6 +24,7 @@ SOFTWARE.
 
 import * as shaders from './shaders.js'
 import {Actor, m2, StaticActor, Flow, StaticActorDef, PresentDef, createRectangleVertices} from './actor.js'
+import {generateColor, normalizeColor, wrap, hashCode, decodeFloat16} from './utils.js'
 import * as maps from './maps.js'
 import {config} from './context.js'
 
@@ -661,7 +662,7 @@ function receivePresent(staticActor, present){
 
     gl.viewport(0, 0, dye.width, dye.height);
     colorProgram.bind();
-    gl.uniform4f(colorProgram.uniforms.color, 1.0, 0.2, 0.2, 0.5);
+    gl.uniform4f(colorProgram.uniforms.color, present.color.r, present.color.g, present.color.b, 0.5);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
     gl.bindFramebuffer(gl.FRAMEBUFFER, dye.write.fbo);
     gl.bindBuffer(gl.ARRAY_BUFFER, staticActor.buffer);
@@ -776,7 +777,7 @@ function runMap(mapBuilder){
             if (obstacle && present){
                 let staticActor = obstacle.getUserData();
                 if(staticActor.expectedPresents > 0){
-                    receivePresent(staticActor, present);
+                    receivePresent(staticActor, present.getUserData());
                     world.destroyBody(present);
                     for( var i = 0; i < actors.length; i++)
                         if ( actors[i].body === present){
@@ -1272,6 +1273,8 @@ canvas.addEventListener('mouseup', e => {
 });
 
 window.addEventListener('keydown', e=> {
+    if(isWaiting) return;
+    
     if (e.code === 'KeyP')
         config.PAUSED = !config.PAUSED;
 	else if(e.keyCode == 27 && buildStack.length){
@@ -1360,53 +1363,6 @@ function correctDeltaY (delta) {
     return delta;
 }
 
-function generateColor () {
-    let c = HSVtoRGB(Math.random(), 1.0, 1.0);
-    c.r *= 0.15;
-    c.g *= 0.15;
-    c.b *= 0.15;
-    return c;
-}
-
-function HSVtoRGB (h, s, v) {
-    let r, g, b, i, f, p, q, t;
-    i = Math.floor(h * 6);
-    f = h * 6 - i;
-    p = v * (1 - s);
-    q = v * (1 - f * s);
-    t = v * (1 - (1 - f) * s);
-
-    switch (i % 6) {
-        case 0: r = v, g = t, b = p; break;
-        case 1: r = q, g = v, b = p; break;
-        case 2: r = p, g = v, b = t; break;
-        case 3: r = p, g = q, b = v; break;
-        case 4: r = t, g = p, b = v; break;
-        case 5: r = v, g = p, b = q; break;
-    }
-
-    return {
-        r,
-        g,
-        b
-    };
-}
-
-function normalizeColor (input) {
-    let output = {
-        r: input.r / 255,
-        g: input.g / 255,
-        b: input.b / 255
-    };
-    return output;
-}
-
-function wrap (value, min, max) {
-    let range = max - min;
-    if (range == 0) return min;
-    return (value - min) % range + min;
-}
-
 function getResolution (resolution) {
     let aspectRatio = gl.drawingBufferWidth / gl.drawingBufferHeight;
     if (aspectRatio < 1)
@@ -1432,28 +1388,3 @@ function scaleByPixelRatio (input) {
     let pixelRatio = window.devicePixelRatio || 1;
     return Math.floor(input * pixelRatio);
 }
-
-function hashCode (s) {
-    if (s.length == 0) return 0;
-    let hash = 0;
-    for (let i = 0; i < s.length; i++) {
-        hash = (hash << 5) - hash + s.charCodeAt(i);
-        hash |= 0; // Convert to 32bit integer
-    }
-    return hash;
-};
-
-var pow = Math.pow;
-function decodeFloat16 (binary) {
-    var exponent = (binary & 0x7C00) >> 10,
-        fraction = binary & 0x03FF;
-    return (binary >> 15 ? -1 : 1) * (
-        exponent ?
-        (
-            exponent === 0x1F ?
-            fraction ? NaN : Infinity :
-            pow(2, exponent - 15) * (1 + fraction / 0x400)
-        ) :
-        6.103515625e-5 * (fraction / 0x400)
-    );
-};
