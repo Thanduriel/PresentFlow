@@ -212,9 +212,9 @@ export function createRectangleVertices(begin, end){
 }
 
 export class StaticActor{
-    constructor(vertices){
+    constructor(vertices, expectedPresents = 0){
         this.vertices = vertices;
-        this.expectedPresents = 1;
+        this.expectedPresents = expectedPresents;
         this.htmlCounter = null;
     }
 

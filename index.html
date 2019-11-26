@@ -7,7 +7,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
         <meta name="apple-mobile-web-app-capable" content="yes">
-        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="mobile-web-app-capable" content="no">
 
         <link rel="apple-touch-icon" href="logo.png">
         <link rel="icon" href="logo.png">
@@ -36,16 +36,44 @@
                 height: 100%;
             }
 
+            section { 
+                display: flex; 
+                margin: auto; 
+                border-radius: 10px; 
+            } 
+
             canvas {
                 display: block;
                 width: 1366px;
                 height: 768px;
             }
-            div {
+            
+            #rootDiv {
                 margin: auto;
                 width: 1366px;
                 height: 768px;
                 position: relative;
+                pointer-events:all;
+            }
+
+            #messageBoard {
+                z-index: 1;
+                position: absolute;
+                text-align: center;
+                font-size: 112px;
+                width: 1366px;
+                left: 0px;
+                top: 0px;
+                line-height: 768px;
+                color: aliceblue;
+                margin: auto;
+                pointer-events:none;
+            }
+            
+            div {
+                z-index: 1;
+                position: absolute;
+                pointer-events:none;
             }
 
             .dg {
@@ -111,7 +139,12 @@
         </script>
     </head>
     <body>
-        <div><canvas oncontextmenu="return false;"></canvas></div>
+        <section>
+        <div id="rootDiv">
+            <canvas oncontextmenu="return false;"></canvas>
+            <p id="messageBoard"></p>
+        </div>
+        </section>
         <script src="node_modules/planck-js/dist/planck.min.js"></script>
         <script src="./script.js" type="module"></script>
     </body>

@@ -32,7 +32,8 @@ var Vec2 = planck.Vec2;
 'use strict';
 
 const canvas = document.getElementsByTagName('canvas')[0];
-const rootDiv = document.getElementsByTagName('div')[0];
+const rootDiv = document.getElementById('rootDiv');
+const messageBoard = document.getElementById('messageBoard');
 resizeCanvas();
 
 function pointerPrototype () {
@@ -669,6 +670,13 @@ function receivePresent(staticActor, present){
     dye.swap();
 }
 
+function spawnNextPresent(){
+    if(presentStack.length == 0) return;
+
+    let [pos, size] = presentStack.pop();
+    actors.push(new Actor(gl,world,pos, size));
+}
+
 function resetBuffers(){
     for(let i = 0; i < obstacles.length; ++i)
         if(obstacles[i].htmlCounter != null)
@@ -691,7 +699,7 @@ function resetBuffers(){
     gl.clear(gl.COLOR_BUFFER_BIT);
 }
 
-function initMap(mapBuilder){
+function runMap(mapBuilder){
     if(currentMap != null) resetBuffers();
 
     currentMap = mapBuilder;
@@ -713,6 +721,7 @@ function initMap(mapBuilder){
     actors = map.actors;
     obstacles = map.obstacles;
     flows = map.flows;
+    presentStack = map.presentStack;
 
     // write static obstacles
     gl.enable(gl.BLEND);
@@ -743,11 +752,11 @@ function initMap(mapBuilder){
 
             var h = document.createElement("div");
             h.innerHTML = obstacles[i].expectedPresents;
-            h.style.position = "absolute";
+    //        h.style.position = "absolute";
             h.style.left = pos.x - 15 * 0.5 + "px";
             h.style.top = pos.y - 21 + "px";
             h.style.fontSize = "42px";
-            h.style.zIndex = 1;
+    //        h.style.zIndex = 1;
             h.style.color = "rgb(56, 255, 189)";
             rootDiv.appendChild(h);
             obstacle.htmlCounter = h;
@@ -780,18 +789,54 @@ function initMap(mapBuilder){
       });
 }
 
+function checkWin(){
+    let expectedPresents = 0;
+    for(let i = 0; i < obstacles.length; ++i){
+        expectedPresents += obstacles[i].expectedPresents;
+    }
+    if (expectedPresents == 0){
+        showMessage("LEVEL COMPLETED", 5000);
+        setTimeout(nextLevel,5000);
+        isWaiting = true;
+    }
+}
+
+function showMessage(msg, time){
+    messageBoard.innerHTML = msg;
+    if(time > 0){
+        setTimeout(function()  
+        {
+            messageBoard.innerHTML = "";
+        }, time);
+    }
+}
+
+function nextLevel(){
+    currentLevel++;
+    if(currentLevel == maps.MAPS.length)
+        showMessage("YOU WON", 0);
+    else{
+        runMap(maps.MAP_TEST); 
+        isWaiting = true;
+        showMessage("LEVEL " + currentLevel);
+    }
+}
+
 const simRes = getResolution(config.SIM_RESOLUTION);
 const simToPixelRatio = new Vec2(simRes.width / config.MAP_SIZE_X, simRes.height / config.MAP_SIZE_Y);
 
+let isWaiting = false;
 let currentMap = null;
+let currentLevel = 0;
 let world = {};
 let actors = [];
 let obstacles = [];
 let flows = [];
+let presentStack = [];
 
 updateKeywords();
 initFramebuffers();
-initMap(maps.MAP_01);
+runMap(maps.MAP_TEST);
 
 let lastUpdateTime = Date.now();
 let colorUpdateTimer = 0.0;
@@ -806,6 +851,8 @@ function update () {
     if (!config.PAUSED)
         step(dt);
     process(dt);
+    if (! isWaiting)
+        checkWin();
     render(null);
     requestAnimationFrame(update);
 }
@@ -1225,17 +1272,19 @@ canvas.addEventListener('mouseup', e => {
 });
 
 window.addEventListener('keydown', e=> {
-    // esc
-	if(e.keyCode == 27 && buildStack.length){
-		// reset current obstacle
+    if (e.code === 'KeyP')
+        config.PAUSED = !config.PAUSED;
+	else if(e.keyCode == 27 && buildStack.length){
+		// delete current obstacle
 		buildStack = [];
 		if(previewObstacle != null){
 			obstacles.pop();
 			previewObstacle = null;
-		}
-	} else if(e.keyCode == 67){
-        initMap(maps.MAP_01);
-    }
+        }
+	} else if(e.code === 'KeyR' && currentMap != null)
+        runMap(currentMap);
+    else if(e.key === ' ')
+        spawnNextPresent();
 });
 
 canvas.addEventListener('touchstart', e => {
@@ -1270,13 +1319,6 @@ window.addEventListener('touchend', e => {
         if (pointer == null) continue;
         updatePointerUpData(pointer);
     }
-});
-
-window.addEventListener('keydown', e => {
-    if (e.code === 'KeyP')
-        config.PAUSED = !config.PAUSED;
-    if (e.key === ' ')
-        splatStack.push(parseInt(Math.random() * 20) + 5);
 });
 
 function updatePointerDownData (pointer, id, posX, posY) {
