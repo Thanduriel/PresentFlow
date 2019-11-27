@@ -35,6 +35,7 @@ var Vec2 = planck.Vec2;
 const canvas = document.getElementsByTagName('canvas')[0];
 const rootDiv = document.getElementById('rootDiv');
 const messageBoard = document.getElementById('messageBoard');
+const obstacleCounter = document.getElementById('obstacleCounter');
 resizeCanvas();
 
 function pointerPrototype () {
@@ -704,8 +705,13 @@ function resetBuffers(){
 }
 
 function runMap(mapBuilder){
-    if(currentMap != null) resetBuffers();
-    timerId = -1;
+    if(currentMap != null) {
+        resetBuffers();
+        if(timerId != -1){
+            clearInterval(timerId);
+            timerId = -1;
+        }
+    }
 
     currentMap = mapBuilder;
 
@@ -728,6 +734,8 @@ function runMap(mapBuilder){
     flows = map.flows;
     presentStack = map.presentStack;
     numPlaceableObstacles = map.placeableObstacles;
+    numPlaceableObstaclesMax = map.placeableObstacles;
+    updateObstacleCounter();
 
     // write static obstacles
     gl.enable(gl.BLEND);
@@ -802,6 +810,7 @@ function checkWin(){
         showMessage("LEVEL COMPLETED", 5000);
         setTimeout(nextLevel,5000);
         isWaiting = true;
+        obstacleCounter.innerHTML = "";
     }
 }
 
@@ -813,6 +822,10 @@ function showMessage(msg, time){
             messageBoard.innerHTML = "";
         }, time);
     }
+}
+
+function updateObstacleCounter(){
+    obstacleCounter.innerHTML = numPlaceableObstacles + "/" + numPlaceableObstaclesMax;
 }
 
 function nextLevel(){
@@ -838,6 +851,7 @@ let obstacles = [];
 let flows = [];
 let presentStack = [];
 let numPlaceableObstacles = 0;
+let numPlaceableObstaclesMax = 0;
 let timerId = -1;
 
 updateKeywords();
@@ -1275,6 +1289,7 @@ canvas.addEventListener('mouseup', e => {
 			return;
         
         --numPlaceableObstacles;
+        updateObstacleCounter();
         buildObstacle(createRectangleVertices(begin,end));
     }
 });
@@ -1293,43 +1308,10 @@ window.addEventListener('keydown', e=> {
         }
 	} else if(e.code === 'KeyR' && currentMap != null)
         runMap(currentMap);
-    else if(e.key === ' ' && timerId === -1)
+    else if(e.key === ' ' && timerId === -1){
         // first comes instantly
         spawnNextPresent();
         timerId = setInterval(spawnNextPresent, 2000);
-});
-
-canvas.addEventListener('touchstart', e => {
-    e.preventDefault();
-    const touches = e.targetTouches;
-    while (touches.length >= pointers.length)
-        pointers.push(new pointerPrototype());
-    for (let i = 0; i < touches.length; i++) {
-        let posX = scaleByPixelRatio(touches[i].pageX);
-        let posY = scaleByPixelRatio(touches[i].pageY);
-        updatePointerDownData(pointers[i + 1], touches[i].identifier, posX, posY);
-    }
-});
-
-canvas.addEventListener('touchmove', e => {
-    e.preventDefault();
-    const touches = e.targetTouches;
-    for (let i = 0; i < touches.length; i++) {
-        let pointer = pointers[i + 1];
-        if (!pointer.down) continue;
-        let posX = scaleByPixelRatio(touches[i].pageX);
-        let posY = scaleByPixelRatio(touches[i].pageY);
-        updatePointerMoveData(pointer, posX, posY);
-    }
-}, false);
-
-window.addEventListener('touchend', e => {
-    const touches = e.changedTouches;
-    for (let i = 0; i < touches.length; i++)
-    {
-        let pointer = pointers.find(p => p.id == touches[i].identifier);
-        if (pointer == null) continue;
-        updatePointerUpData(pointer);
     }
 });
 
