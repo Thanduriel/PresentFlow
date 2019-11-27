@@ -33,7 +33,8 @@ export const MAP_01 = (gl, world) =>{
 	return {actors : [], 
 		obstacles : obstacles, 
 		flows : flows, 
-		presentStack : presentStack};
+		presentStack : presentStack,
+		placeableObstacles : 3};
 }
 
 export const MAP_02 = (gl, world) =>{

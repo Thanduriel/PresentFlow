@@ -672,7 +672,10 @@ function receivePresent(staticActor, present){
 }
 
 function spawnNextPresent(){
-    if(presentStack.length == 0) return;
+    if(presentStack.length == 0) {
+        clearInterval(timerId);
+        return;
+    }
 
     let [size, pos] = presentStack.pop();
     actors.push(new Actor(gl, world, size, pos));
@@ -702,6 +705,7 @@ function resetBuffers(){
 
 function runMap(mapBuilder){
     if(currentMap != null) resetBuffers();
+    timerId = -1;
 
     currentMap = mapBuilder;
 
@@ -723,6 +727,7 @@ function runMap(mapBuilder){
     obstacles = map.obstacles;
     flows = map.flows;
     presentStack = map.presentStack;
+    numPlaceableObstacles = map.placeableObstacles;
 
     // write static obstacles
     gl.enable(gl.BLEND);
@@ -832,6 +837,8 @@ let actors = [];
 let obstacles = [];
 let flows = [];
 let presentStack = [];
+let numPlaceableObstacles = 0;
+let timerId = -1;
 
 updateKeywords();
 initFramebuffers();
@@ -1225,8 +1232,9 @@ function correctRadius (radius) {
 }
 
 canvas.addEventListener('mousedown', e => {
-	// start new obstacle
-    if(e.button === 0) buildStack.push(Vec2(e.offsetX, canvas.height-e.offsetY));
+	// start new obstacle with left mouse button
+    if(e.button === 0 && numPlaceableObstacles > 0) 
+        buildStack.push(Vec2(e.offsetX, canvas.height-e.offsetY));
     else {
         let posX = scaleByPixelRatio(e.offsetX);
         let posY = scaleByPixelRatio(e.offsetY);
@@ -1266,6 +1274,7 @@ canvas.addEventListener('mouseup', e => {
 		if(Vec2.sub(begin,end).length() < 20)
 			return;
         
+        --numPlaceableObstacles;
         buildObstacle(createRectangleVertices(begin,end));
     }
 });
@@ -1284,8 +1293,10 @@ window.addEventListener('keydown', e=> {
         }
 	} else if(e.code === 'KeyR' && currentMap != null)
         runMap(currentMap);
-    else if(e.key === ' ')
+    else if(e.key === ' ' && timerId === -1)
+        // first comes instantly
         spawnNextPresent();
+        timerId = setInterval(spawnNextPresent, 2000);
 });
 
 canvas.addEventListener('touchstart', e => {
