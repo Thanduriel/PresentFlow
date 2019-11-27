@@ -674,8 +674,8 @@ function receivePresent(staticActor, present){
 function spawnNextPresent(){
     if(presentStack.length == 0) return;
 
-    let [pos, size] = presentStack.pop();
-    actors.push(new Actor(gl,world,pos, size));
+    let [size, pos] = presentStack.pop();
+    actors.push(new Actor(gl, world, size, pos));
 }
 
 function resetBuffers(){
@@ -753,11 +753,9 @@ function runMap(mapBuilder){
 
             var h = document.createElement("div");
             h.innerHTML = obstacles[i].expectedPresents;
-    //        h.style.position = "absolute";
             h.style.left = pos.x - 15 * 0.5 + "px";
-            h.style.top = pos.y - 21 + "px";
+            h.style.top = 768 -  pos.y - 21 + "px";
             h.style.fontSize = "42px";
-    //        h.style.zIndex = 1;
             h.style.color = "rgb(56, 255, 189)";
             rootDiv.appendChild(h);
             obstacle.htmlCounter = h;
@@ -837,7 +835,7 @@ let presentStack = [];
 
 updateKeywords();
 initFramebuffers();
-runMap(maps.MAP_TEST);
+runMap(maps.MAP_01);
 
 let lastUpdateTime = Date.now();
 let colorUpdateTimer = 0.0;

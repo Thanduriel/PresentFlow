@@ -117,7 +117,7 @@ export class Actor {
         this.body = world.createBody({
             type: 'dynamic',
             position: position,
-            linearVelocity: Vec2(-100.01,0.0),
+            linearVelocity: Vec2(0.0,0.0),
             userData : this
         });
         this.body.createFixture(planck.Box(size.x*0.5, size.y*0.5, Vec2(0.5,0.5)), PresentDef);
