@@ -804,9 +804,10 @@ function nextLevel(){
         showMessage("YOU WON", 0);
         return;
     }
-    if(currentLevel === 1) runMap(maps.MAP_01);
+    if(currentLevel === 1) runMap(maps.MAP_02);
     if(currentLevel === 2) runMap(maps.MAP_02);
-    isWaiting = true;
+    if(currentLevel === 3) runMap(maps.MAP_03);
+    isWaiting = false;
     showMessage("LEVEL " + currentLevel, 3000);
 }
 
@@ -1269,9 +1270,12 @@ canvas.addEventListener('mouseup', e => {
 });
 
 window.addEventListener('keydown', e=> {
-    if(!config.HAS_STARTED) startNewGame();
+    if(!config.HAS_STARTED) {
+        startNewGame();
+        return;
+    }
     if(isWaiting) return;
-    
+
     if (e.code === 'KeyP')
         config.PAUSED = !config.PAUSED;
 	else if(e.keyCode == 27 && buildStack.length){
@@ -1287,6 +1291,9 @@ window.addEventListener('keydown', e=> {
         // first comes instantly
         spawnNextPresent();
         timerId = setInterval(spawnNextPresent, 2000);
+        // prevent obstacle placement after spawning
+        numPlaceableObstacles = 0;
+        updateObstacleCounter();
     }
 });
 

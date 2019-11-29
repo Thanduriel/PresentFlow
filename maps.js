@@ -1,5 +1,5 @@
 
-import {Actor, StaticActor, Flow, createRectangleVertices} from './actor.js'
+import {Actor, StaticActor, Flow, createAAVs} from './actor.js'
 let Vec2 = planck.Vec2;
 
 export const MAP_TEST = (gl, world) => {
@@ -38,6 +38,40 @@ export const MAP_01 = (gl, world) =>{
 }
 
 export const MAP_02 = (gl, world) =>{
+	const sourcePos = Vec2(50, 768/2);
+	const uPos = Vec2(1366/2, 768/2);
+	const uWidth = 72;
+	const uLength = 290;
+	const begin = uLength/2 - uWidth;
+	const uLength_2 = uLength/2;
+
+	const presentStack = [[Vec2(50,50), sourcePos.clone()],
+						  [Vec2(50,50), sourcePos.clone()],
+						  [Vec2(50,50), sourcePos.clone()],
+						  [Vec2(50,50), sourcePos.clone()],
+						  [Vec2(50,50), sourcePos.clone()],
+						  [Vec2(50,50), sourcePos.clone()]];
+	let obstacles = [];
+	
+	obstacles.push(new StaticActor(createAAVs(Vec2(begin, uLength_2).add(uPos),
+							  Vec2(uLength_2, -uLength_2).add(uPos)), 1));
+	obstacles.push(new StaticActor(createAAVs(Vec2(-uLength_2, begin).add(uPos),
+							  Vec2(begin, uLength_2).add(uPos)), 1));
+	obstacles.push(new StaticActor(createAAVs(Vec2(-uLength_2, -begin).add(uPos),
+							  Vec2(begin, -uLength_2).add(uPos)), 1));
+	obstacles.push(new StaticActor(createAAVs(Vec2(-32, -32).add(uPos),
+							  Vec2(32, 32).add(uPos)), 2));
+
+	const flow01 = new Flow(sourcePos.clone(), Vec2.add(sourcePos,Vec2(200, 0)), 20.0, {r:0,g:0.5,b:0.4}, 1.0);
+	const source2Pos = Vec2(1366-sourcePos.x, sourcePos.y);
+	const flow02 = new Flow(source2Pos, Vec2.sub(source2Pos, Vec2(200,0)), 20.0, {r:0.7,g:0.3,b:0.4}, 1.0);
+	let flows = [flow01, flow02];
+
+	return {actors : [], 
+		obstacles : obstacles, 
+		flows : flows, 
+		presentStack : presentStack,
+		placeableObstacles : 4};
 }
 
 export const MAP_03 = (gl, world) =>{

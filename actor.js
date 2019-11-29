@@ -221,6 +221,10 @@ export function createRectangleVertices(begin, end){
     return [Vec2.add(begin,offset), Vec2.sub(begin,offset), Vec2.add(end,offset), Vec2.sub(end,offset)];
 }
 
+export function createAAVs(begin, end){
+    return [begin, Vec2(end.x,begin.y), Vec2(begin.x,end.y), end];
+}
+
 export class StaticActor{
     constructor(vertices, expectedPresents = 0){
         this.vertices = vertices;
