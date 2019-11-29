@@ -161,41 +161,6 @@ function supportRenderTextureFormat (gl, internalFormat, format, type) {
     return status == gl.FRAMEBUFFER_COMPLETE;
 }
 
-function startGUI () {
-    var gui = new dat.GUI({ width: 300 });
-    gui.add(config, 'DYE_RESOLUTION', { 'high': 1024, 'medium': 512, 'low': 256, 'very low': 128 }).name('quality').onFinishChange(initFramebuffers);
-    gui.add(config, 'SIM_RESOLUTION', { '32': 32, '64': 64, '128': 128, '256': 256 }).name('sim resolution').onFinishChange(initFramebuffers);
-    gui.add(config, 'DENSITY_DISSIPATION', 0, 4.0).name('density diffusion');
-    gui.add(config, 'VELOCITY_DISSIPATION', 0, 4.0).name('velocity diffusion');
-    gui.add(config, 'PRESSURE', 0.0, 1.0).name('pressure');
-    gui.add(config, 'CURL', 0, 50).name('vorticity').step(1);
-    gui.add(config, 'SPLAT_RADIUS', 0.01, 1.0).name('splat radius');
-    gui.add(config, 'SHADING').name('shading').onFinishChange(updateKeywords);
-    gui.add(config, 'COLORFUL').name('colorful');
-    gui.add(config, 'PAUSED').name('paused').listen();
-
-    gui.add({ fun: () => {
-        splatStack.push(parseInt(Math.random() * 20) + 5);
-    } }, 'fun').name('Random splats');
-
-    let bloomFolder = gui.addFolder('Bloom');
-    bloomFolder.add(config, 'BLOOM').name('enabled').onFinishChange(updateKeywords);
-    bloomFolder.add(config, 'BLOOM_INTENSITY', 0.1, 2.0).name('intensity');
-    bloomFolder.add(config, 'BLOOM_THRESHOLD', 0.0, 1.0).name('threshold');
-
-    let sunraysFolder = gui.addFolder('Sunrays');
-    sunraysFolder.add(config, 'SUNRAYS').name('enabled').onFinishChange(updateKeywords);
-    sunraysFolder.add(config, 'SUNRAYS_WEIGHT', 0.3, 1.0).name('weight');
-
-    let captureFolder = gui.addFolder('Capture');
-    captureFolder.addColor(config, 'BACK_COLOR').name('background color');
-    captureFolder.add(config, 'TRANSPARENT').name('transparent');
-    captureFolder.add({ fun: captureScreenshot }, 'fun').name('take screenshot');
-
-    if (isMobile())
-        gui.close();
-}
-
 function isMobile () {
     return /Mobi|Android/i.test(navigator.userAgent);
 }
@@ -768,8 +733,6 @@ function runMap(mapBuilder){
             h.innerHTML = obstacles[i].expectedPresents;
             h.style.left = pos.x - 15 * 0.5 + "px";
             h.style.top = 768 -  pos.y - 21 + "px";
-            h.style.fontSize = "42px";
-            h.style.color = "rgb(56, 255, 189)";
             rootDiv.appendChild(h);
             obstacle.htmlCounter = h;
         }
@@ -828,15 +791,23 @@ function updateObstacleCounter(){
     obstacleCounter.innerHTML = numPlaceableObstacles + "/" + numPlaceableObstaclesMax;
 }
 
+function startNewGame(){
+    currentLevel = 0;
+    nextLevel();
+    config.HAS_STARTED = true;
+    config.PAUSED = false;
+}
+
 function nextLevel(){
     currentLevel++;
-    if(currentLevel == maps.MAPS.length)
+    if(currentLevel == maps.MAPS.length){
         showMessage("YOU WON", 0);
-    else{
-        runMap(maps.MAP_TEST); 
-        isWaiting = true;
-        showMessage("LEVEL " + currentLevel);
+        return;
     }
+    if(currentLevel === 1) runMap(maps.MAP_01);
+    if(currentLevel === 2) runMap(maps.MAP_02);
+    isWaiting = true;
+    showMessage("LEVEL " + currentLevel, 3000);
 }
 
 const simRes = getResolution(config.SIM_RESOLUTION);
@@ -856,7 +827,6 @@ let timerId = -1;
 
 updateKeywords();
 initFramebuffers();
-runMap(maps.MAP_01);
 
 let lastUpdateTime = Date.now();
 let colorUpdateTimer = 0.0;
@@ -868,11 +838,11 @@ function update () {
         initFramebuffers();
     updateColors(dt);
     applyInputs();
-    if (!config.PAUSED)
+    if (!config.PAUSED){
         step(dt);
-    process(dt);
-    if (! isWaiting)
-        checkWin();
+        process(dt);
+        if (!isWaiting) checkWin();
+    }
     render(null);
     requestAnimationFrame(update);
 }
@@ -1246,6 +1216,10 @@ function correctRadius (radius) {
 }
 
 canvas.addEventListener('mousedown', e => {
+    if(!config.HAS_STARTED) {
+        startNewGame();
+        return;
+    }
 	// start new obstacle with left mouse button
     if(e.button === 0 && numPlaceableObstacles > 0) 
         buildStack.push(Vec2(e.offsetX, canvas.height-e.offsetY));
@@ -1295,6 +1269,7 @@ canvas.addEventListener('mouseup', e => {
 });
 
 window.addEventListener('keydown', e=> {
+    if(!config.HAS_STARTED) startNewGame();
     if(isWaiting) return;
     
     if (e.code === 'KeyP')

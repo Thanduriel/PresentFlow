@@ -28,6 +28,8 @@
             html, body {
                 overflow: hidden;
                 background-color: rgb(28, 28, 28);
+                color: aliceblue;
+                text-align: center;
             }
 
             body {
@@ -83,6 +85,14 @@
                 z-index: 1;
                 position: absolute;
                 pointer-events:none;
+                font-size: 42px;
+                color: aliceblue;
+            }
+
+            h1 {
+                font-size: 52px;
+                color: aliceblue;
+                text-align: center;
             }
 
             .dg {
@@ -132,6 +142,10 @@
         </script>
     </head>
     <body>
+        <h1>- PresentFlow -</h1>
+        <p>Rising water levels due to global warming have given Santa Claus a new way to deliver presents! 
+            By carefully redirecting the water flow, presents can be destributed without having to visit each place.</p>
+        <P>left mouse - place obstacle | ESC - cancel placement | P - pause/unpause | R - reset current level | Space - spawn presents</P>
         <section>
         <div id="rootDiv">
             <canvas oncontextmenu="return false;"></canvas>
