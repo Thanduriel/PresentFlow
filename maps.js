@@ -19,6 +19,7 @@ export const MAP_TEST = (gl, world) => {
 		presentStack : presentStack};
 }
 
+// record: 2
 export const MAP_01 = (gl, world) =>{
 	const sourcePos = Vec2(50, 768/2);
 
@@ -38,6 +39,7 @@ export const MAP_01 = (gl, world) =>{
 		placeableObstacles : 3};
 }
 
+// record: 3
 export const MAP_02 = (gl, world) =>{
 	const center = Vec2(1366/2, 768/2);
 	const fortressPos = Vec2(1366/2, 768/2);
@@ -84,7 +86,7 @@ export const MAP_02 = (gl, world) =>{
 		obstacles : obstacles, 
 		flows : flows, 
 		presentStack : presentStack,
-		placeableObstacles : 3};
+		placeableObstacles : 4};
 }
 
 // record: 3
@@ -163,7 +165,7 @@ export const MAP_04 = (gl, world) =>{
 		obstacles : obstacles, 
 		flows : flows, 
 		presentStack : presentStack,
-		placeableObstacles : 6};
+		placeableObstacles : 5};
 }
 
 export const MAP_FINISHED = (gl, world) =>{

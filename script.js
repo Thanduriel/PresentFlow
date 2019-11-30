@@ -771,8 +771,10 @@ function checkWin(){
     }
     if (expectedPresents == 0){
         showMessage("LEVEL COMPLETED", 5000);
+        if(numPlaceableObstacles === 0)
+            bonus = false;
         setTimeout(nextLevel,5000);
-        isWaiting = true;
+        gameState = GameState.WAITING;
         obstacleCounter.innerHTML = "";
     }
 }
@@ -798,27 +800,48 @@ function startNewGame(){
     config.PAUSED = false;
 }
 
+function showCode(){
+//    messageBoard.style.lineHeight = "384px";
+    messageBoard.style.fontSize = "74px";
+//    messageBoard.style.pointerEvents = "all";
+    showMessage("CODE CAN BE FOUND BELOW", 8000);
+    const codeBoard = document.getElementById('codeBoard');
+    const bonusCode = bonus ? " | Bonus:" + atob("d2gxdGVfaDB0X2Nob2NvbGF0ZQ==") : "";
+    codeBoard.innerHTML = "Code:" + atob("RG9taW5vc3RlaW5fR3VnZWxodXBm") 
+                        + bonusCode;
+}
+
 function nextLevel(){
     currentLevel++;
-    if(currentLevel > 1){
-        showMessage("YOU WON<br>CODE Dominostein_Gugelhupf", 0);
-        messageBoard.style.lineHeight = "384px";
-    //    messageBoard.style.color = "rgb(0,0,0)";
-    //    messageBoard.style.webkitTextStroke = "1px aliceblue";
+    if(currentLevel >= 2) {
+        runMap(maps.MAP_FINISHED);
+        showMessage("YOU WON!", 0);
+        obstacleCounter.innerHTML = "";
+        setTimeout(showCode, 5000);
+        gameState = GameState.WAITING;
         return;
     }
-    if(currentLevel === 1) runMap(maps.MAP_FINISHED);
+  
+    if(currentLevel === 1) runMap(maps.MAP_01);
     if(currentLevel === 2) runMap(maps.MAP_02);
     if(currentLevel === 3) runMap(maps.MAP_03);
     if(currentLevel === 4) runMap(maps.MAP_04);
-    isWaiting = false;
+    gameState = GameState.RUNNING;
     showMessage("LEVEL " + currentLevel, 3000);
 }
 
 const simRes = getResolution(config.SIM_RESOLUTION);
 const simToPixelRatio = new Vec2(simRes.width / config.MAP_SIZE_X, simRes.height / config.MAP_SIZE_Y);
 
-let isWaiting = false;
+const GameState = {
+    RUNNING : 0,
+    SPAWNING: 1,
+    WAITING : 2,
+    NEW     : 3
+}
+
+let gameState = GameState.NEW;
+let bonus = true;
 let currentMap = null;
 let currentLevel = 0;
 let world = {};
@@ -846,7 +869,7 @@ function update () {
     if (!config.PAUSED){
         step(dt);
         process(dt);
-        if (!isWaiting) checkWin();
+        if (gameState === GameState.SPAWNING) checkWin();
     }
     render(null);
     requestAnimationFrame(update);
@@ -882,8 +905,8 @@ function process(dt) {
     // update flows
     for(let i = 0; i < flows.length; ++i){
         let flow = flows[i];
-        const color = flow.color.r + flow.color.g + flow.color.b === 0 ?
-            HSVtoRGB((Math.random()+i)*0.25,1, Math.random()) : flow.color;   
+        const color = (flow.color.r + flow.color.g + flow.color.b === 0 ?
+            HSVtoRGB((Math.random()+i)*0.25,1, Math.random()) : flow.color);   
         splat(flow.positionBegin.x, flow.positionBegin.y, 
             flow.direction.x, flow.direction.y, color, flow.radius, dt * flow.force); //flow.color, 10.0, flow.force * dt
     }
@@ -1228,16 +1251,18 @@ canvas.addEventListener('mousedown', e => {
         return;
     }
 	// start new obstacle with left mouse button
-    if(e.button === 0 && numPlaceableObstacles > 0) 
-        buildStack.push(Vec2(e.offsetX, canvas.height-e.offsetY));
-    else {
-        let posX = scaleByPixelRatio(e.offsetX);
-        let posY = scaleByPixelRatio(e.offsetY);
-        let pointer = pointers.find(p => p.id == -1);
-        if (pointer == null)
-            pointer = new pointerPrototype();
-        updatePointerDownData(pointer, -1, posX, posY);
-    }
+    if(e.button === 0){
+        if(numPlaceableObstacles > 0 && gameState === GameState.RUNNING) 
+            buildStack.push(Vec2(e.offsetX, canvas.height-e.offsetY));
+        else if(gameState === GameState.WAITING){
+            let posX = scaleByPixelRatio(e.offsetX);
+            let posY = scaleByPixelRatio(e.offsetY);
+            let pointer = pointers.find(p => p.id == -1);
+            if (pointer == null)
+                pointer = new pointerPrototype();
+            updatePointerDownData(pointer, -1, posX, posY);
+        }
+    } 
 });
 
 canvas.addEventListener('mousemove', e => {
@@ -1280,7 +1305,7 @@ window.addEventListener('keydown', e=> {
         startNewGame();
         return;
     }
-    if(isWaiting) return;
+    if(gameState === GameState.WAITING) return;
 
     if (e.code === 'KeyP')
         config.PAUSED = !config.PAUSED;
@@ -1296,12 +1321,13 @@ window.addEventListener('keydown', e=> {
 	if(e.code === 'KeyR' && currentMap != null)
         runMap(currentMap);
     else if(e.key === ' ' && timerId === -1){
-        // first comes instantly
+        // interrupt current placement
+        buildStack = [];
+        // first present comes instantly
         spawnNextPresent();
         timerId = setInterval(spawnNextPresent, 2000);
         // prevent obstacle placement after spawning
-        numPlaceableObstacles = 0;
-        updateObstacleCounter();
+        gameState = GameState.SPAWNING;
     }
 });
 
