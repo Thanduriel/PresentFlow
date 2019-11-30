@@ -1,5 +1,6 @@
 
 import {Actor, StaticActor, Flow, createAAVs} from './actor.js'
+import {config} from './context.js'
 let Vec2 = planck.Vec2;
 
 export const MAP_TEST = (gl, world) => {
@@ -75,6 +76,43 @@ export const MAP_02 = (gl, world) =>{
 }
 
 export const MAP_03 = (gl, world) =>{
+	const sourcePos = Vec2(50, 768/3);
+	const source2Pos = Vec2(50, 2*768/3);
+	const buildingSize = 64;
+	const buildingGrid = 256;
+	const offset = Vec2((config.MAP_SIZE_X - (buildingGrid * 4)) / 2,
+						(config.MAP_SIZE_Y - (buildingGrid * 2)) / 2);
+
+	const presentStack = [[Vec2(50,50), sourcePos.clone()],
+						  [Vec2(50,50), source2Pos.clone()],
+						  [Vec2(50,50), sourcePos.clone()],
+						  [Vec2(50,50), source2Pos.clone()],
+						  [Vec2(50,50), sourcePos.clone()],
+						  [Vec2(50,50), source2Pos.clone()],
+						  [Vec2(50,50), sourcePos.clone()],
+						  [Vec2(50,50), source2Pos.clone()],
+						  [Vec2(50,50), sourcePos.clone()],
+						  [Vec2(50,50), source2Pos.clone()]];
+	let obstacles = [];
+	
+	for(let ix = 0; ix < 5; ++ix)
+		for(let iy = 0; iy < 3; ++iy){
+			const numPresents = ix + iy > 2 ? 1 : 0;
+			const pos = Vec2(ix*buildingGrid, iy*buildingGrid).add(offset);
+			obstacles.push(new StaticActor(createAAVs(Vec2(-buildingSize, -buildingSize).add(pos),
+							  Vec2(buildingSize, buildingSize).add(pos)), 
+							  numPresents));
+		}
+
+	const flow01 = new Flow(sourcePos.clone(), Vec2.add(sourcePos,Vec2(200, 0)), 20.0, {r:0.8,g:0.0,b:0.9}, 0.5);
+	const flow02 = new Flow(source2Pos, Vec2.add(source2Pos, Vec2(200,0)), 20.0, {r:0.3,g:0.9,b:0.4}, 0.5);
+	let flows = [flow01, flow02];
+
+	return {actors : [], 
+		obstacles : obstacles, 
+		flows : flows, 
+		presentStack : presentStack,
+		placeableObstacles : 4};
 }
 
 export const MAPS = [MAP_01, MAP_02, MAP_03];

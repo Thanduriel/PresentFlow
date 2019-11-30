@@ -804,7 +804,7 @@ function nextLevel(){
         showMessage("YOU WON", 0);
         return;
     }
-    if(currentLevel === 1) runMap(maps.MAP_02);
+    if(currentLevel === 1) runMap(maps.MAP_03);
     if(currentLevel === 2) runMap(maps.MAP_02);
     if(currentLevel === 3) runMap(maps.MAP_03);
     isWaiting = false;
@@ -1278,14 +1278,16 @@ window.addEventListener('keydown', e=> {
 
     if (e.code === 'KeyP')
         config.PAUSED = !config.PAUSED;
-	else if(e.keyCode == 27 && buildStack.length){
-		// delete current obstacle
+    // cancel current obstacle
+	if((e.keyCode == 27 || e.code === 'KeyR') && buildStack.length){
 		buildStack = [];
 		if(previewObstacle != null){
 			obstacles.pop();
 			previewObstacle = null;
         }
-	} else if(e.code === 'KeyR' && currentMap != null)
+    }
+    // reset
+	if(e.code === 'KeyR' && currentMap != null)
         runMap(currentMap);
     else if(e.key === ' ' && timerId === -1){
         // first comes instantly
