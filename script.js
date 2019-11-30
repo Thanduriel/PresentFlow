@@ -813,7 +813,7 @@ function showCode(){
 
 function nextLevel(){
     currentLevel++;
-    if(currentLevel >= 2) {
+    if(currentLevel >= 5) {
         runMap(maps.MAP_FINISHED);
         showMessage("YOU WON!", 0);
         obstacleCounter.innerHTML = "";
