@@ -24,7 +24,7 @@ SOFTWARE.
 
 import * as shaders from './shaders.js'
 import {Actor, m2, StaticActor, Flow, StaticActorDef, PresentDef, createRectangleVertices} from './actor.js'
-import {generateColor, normalizeColor, wrap, hashCode, decodeFloat16} from './utils.js'
+import {generateColor, normalizeColor, wrap, hashCode, decodeFloat16, HSVtoRGB} from './utils.js'
 import * as maps from './maps.js'
 import {config} from './context.js'
 
@@ -611,7 +611,7 @@ function buildObstacle(vertices, enablePhysics=true){
 		gl.enableVertexAttribArray(0);
 	//    gl.bindBuffer(gl.ARRAY_BUFFER, solidVertexBuffer);
 		gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-		gl.drawArrays(gl.TRIANGLE_STRIP, 0, obstacle.vertices.length); 
+		gl.drawArrays(gl.TRIANGLE_FAN, 0, obstacle.vertices.length); 
 	}
 
 	return obstacle;
@@ -633,7 +633,7 @@ function receivePresent(staticActor, present){
     gl.bindFramebuffer(gl.FRAMEBUFFER, dye.write.fbo);
     gl.bindBuffer(gl.ARRAY_BUFFER, staticActor.buffer);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, staticActor.vertices.length); 
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, staticActor.vertices.length); 
     dye.swap();
 }
 
@@ -720,7 +720,7 @@ function runMap(mapBuilder){
         obstacle.createBuffer(gl);
         obstacle.createBody(world);
         gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, obstacle.vertices.length); 
+        gl.drawArrays(gl.TRIANGLE_FAN, 0, obstacle.vertices.length); 
 
         if(obstacle.expectedPresents){
             // compute avg position
@@ -800,13 +800,17 @@ function startNewGame(){
 
 function nextLevel(){
     currentLevel++;
-    if(currentLevel == maps.MAPS.length){
-        showMessage("YOU WON", 0);
+    if(currentLevel > 1){
+        showMessage("YOU WON<br>CODE Dominostein_Gugelhupf", 0);
+        messageBoard.style.lineHeight = "384px";
+    //    messageBoard.style.color = "rgb(0,0,0)";
+    //    messageBoard.style.webkitTextStroke = "1px aliceblue";
         return;
     }
-    if(currentLevel === 1) runMap(maps.MAP_03);
+    if(currentLevel === 1) runMap(maps.MAP_FINISHED);
     if(currentLevel === 2) runMap(maps.MAP_02);
     if(currentLevel === 3) runMap(maps.MAP_03);
+    if(currentLevel === 4) runMap(maps.MAP_04);
     isWaiting = false;
     showMessage("LEVEL " + currentLevel, 3000);
 }
@@ -878,8 +882,10 @@ function process(dt) {
     // update flows
     for(let i = 0; i < flows.length; ++i){
         let flow = flows[i];
+        const color = flow.color.r + flow.color.g + flow.color.b === 0 ?
+            HSVtoRGB((Math.random()+i)*0.25,1, Math.random()) : flow.color;   
         splat(flow.positionBegin.x, flow.positionBegin.y, 
-            flow.direction.x, flow.direction.y, flow.color, flow.radius, dt * flow.force); //flow.color, 10.0, flow.force * dt
+            flow.direction.x, flow.direction.y, color, flow.radius, dt * flow.force); //flow.color, 10.0, flow.force * dt
     }
 }
 
@@ -1089,7 +1095,7 @@ function drawObstacles(fbo){
     for(let i = 0; i < obstacles.length; ++i){
         gl.bindBuffer(gl.ARRAY_BUFFER, obstacles[i].buffer);
         gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, obstacles[i].vertices.length); 
+        gl.drawArrays(gl.TRIANGLE_FAN, 0, obstacles[i].vertices.length); 
     }
 }
 

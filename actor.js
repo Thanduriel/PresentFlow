@@ -218,11 +218,22 @@ export function createRectangleVertices(begin, end){
     offset.normalize();
     offset.mul(config.OBSTACLE_HALF_WIDTH);
 
-    return [Vec2.add(begin,offset), Vec2.sub(begin,offset), Vec2.add(end,offset), Vec2.sub(end,offset)];
+    return [Vec2.add(begin,offset), Vec2.sub(begin,offset), Vec2.sub(end,offset), Vec2.add(end,offset)];
 }
 
 export function createAAVs(begin, end){
-    return [begin, Vec2(end.x,begin.y), Vec2(begin.x,end.y), end];
+    return [begin, Vec2(end.x,begin.y), end, Vec2(begin.x,end.y)];
+}
+
+export function createRegularPolygonVs(numPoints, radius, center){
+    let vertices = [];
+    const angle = 2 * 3.1415 / numPoints;
+    for (let i = 0; i < numPoints; i++)
+    {
+        vertices.push(Vec2(radius * Math.sin(i * angle), radius * Math.cos(i * angle)).add(center));
+    }
+
+    return vertices;
 }
 
 export class StaticActor{

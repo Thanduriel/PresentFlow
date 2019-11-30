@@ -1,5 +1,5 @@
 
-import {Actor, StaticActor, Flow, createAAVs} from './actor.js'
+import {Actor, StaticActor, Flow, createAAVs, createRegularPolygonVs} from './actor.js'
 import {config} from './context.js'
 let Vec2 = planck.Vec2;
 
@@ -25,8 +25,8 @@ export const MAP_01 = (gl, world) =>{
 	const presentStack = [[Vec2(50,50), sourcePos.clone()],[Vec2(50,50), sourcePos.clone()]];
 	let obstacles = [];
 	
-	obstacles.push(new StaticActor([Vec2(683, 92), Vec2(883, 92), Vec2(683, 292), Vec2(883, 292)], 1));
-	obstacles.push(new StaticActor([Vec2(683, 92+384), Vec2(883, 92+384), Vec2(683, 292+384), Vec2(883, 292+384)], 1));
+	obstacles.push(new StaticActor([Vec2(683, 92), Vec2(883, 92), Vec2(883, 292), Vec2(683, 292)], 1));
+	obstacles.push(new StaticActor([Vec2(683, 92+384), Vec2(883, 92+384), Vec2(883, 292+384), Vec2(683, 292+384)], 1));
 	
 	const flow01 = new Flow(sourcePos, Vec2.add(sourcePos,Vec2(200, 0)), 20.0, {r:0,g:0.1,b:0.5}, 1.0);
 	let flows = [flow01];
@@ -39,6 +39,56 @@ export const MAP_01 = (gl, world) =>{
 }
 
 export const MAP_02 = (gl, world) =>{
+	const center = Vec2(1366/2, 768/2);
+	const fortressPos = Vec2(1366/2, 768/2);
+	const numTriangles = 8;
+
+	let obstacles = [];
+	
+	obstacles.push(new StaticActor(createRegularPolygonVs(5, 128, fortressPos), 6));
+	const vertices = createRegularPolygonVs(numTriangles, 180, fortressPos);
+	for(let i = 0; i < numTriangles-1; ++i){
+		const v = vertices[i];
+		let dir = Vec2.sub(v, fortressPos);
+		dir.normalize();
+		const dirOrth = Vec2(-dir.y, dir.x);
+		obstacles.push(new StaticActor([v.clone().addMul(100, dir),
+										v.clone().addMul(-50, dirOrth),
+										v.clone().addMul(50, dirOrth)],0));
+	}
+	
+	const pos0 = Vec2(50,50);
+	const pos1 = Vec2(1366-50,50);
+	const pos2 = Vec2(1366-50,768-50);
+
+	const presentStack = [[Vec2(50,50), pos2.clone()],
+		[Vec2(50,50), pos0.clone()],
+		[Vec2(50,50), pos1.clone()],
+		[Vec2(50,50), pos2.clone()],
+		[Vec2(50,50), pos0.clone()],
+		[Vec2(50,50), pos1.clone()],
+		[Vec2(50,50), pos2.clone()]];
+
+	let dir = Vec2.sub(center, pos0);
+	dir.normalize();
+	const flow01 = new Flow(pos0, dir.mul(100).add(pos0), 20.0, {r:0.4,g:0.0,b:0.0}, 1.0);
+	dir = Vec2.sub(center, pos1);
+	dir.normalize();
+	const flow02 = new Flow(pos1, dir.mul(100).add(pos1), 20.0, {r:0,g:0.4,b:0.0}, 1.0);
+	dir = Vec2.sub(center, pos2);
+	dir.normalize();
+	const flow03 = new Flow(pos2, dir.mul(100).add(pos2), 20.0, {r:0,g:0.0,b:0.4}, 1.0);
+	let flows = [flow01, flow02, flow03];
+
+	return {actors : [], 
+		obstacles : obstacles, 
+		flows : flows, 
+		presentStack : presentStack,
+		placeableObstacles : 3};
+}
+
+// record: 3
+export const MAP_03 = (gl, world) =>{
 	const sourcePos = Vec2(50, 768/2);
 	const uPos = Vec2(1366/2, 768/2);
 	const uWidth = 72;
@@ -75,7 +125,8 @@ export const MAP_02 = (gl, world) =>{
 		placeableObstacles : 4};
 }
 
-export const MAP_03 = (gl, world) =>{
+// record: 4
+export const MAP_04 = (gl, world) =>{
 	const sourcePos = Vec2(50, 768/3);
 	const source2Pos = Vec2(50, 2*768/3);
 	const buildingSize = 64;
@@ -112,7 +163,54 @@ export const MAP_03 = (gl, world) =>{
 		obstacles : obstacles, 
 		flows : flows, 
 		presentStack : presentStack,
-		placeableObstacles : 4};
+		placeableObstacles : 6};
+}
+
+export const MAP_FINISHED = (gl, world) =>{
+	const center = Vec2(1366/2, 768/2);
+	const fortressPos = Vec2(1366/2, 768/2);
+	const numTriangles = 12;
+
+	let obstacles = [];
+	
+	obstacles.push(new StaticActor(createRegularPolygonVs(6, 128, fortressPos), 0));
+	const vertices = createRegularPolygonVs(numTriangles, 180, fortressPos);
+	for(let i = 0; i < numTriangles; ++i){
+		const v = vertices[i];
+		let dir = Vec2.sub(v, fortressPos);
+		dir.normalize();
+		const dirOrth = Vec2(-dir.y, dir.x);
+		obstacles.push(new StaticActor([v.clone().addMul(80, dir),
+										v.clone().addMul(-40, dirOrth),
+										v.clone().addMul(40, dirOrth)],0));
+	}
+	
+	const pos0 = Vec2(50,50);
+	const pos1 = Vec2(1366-50,50);
+	const pos2 = Vec2(1366-50,768-50);
+	const pos3 = Vec2(50,768-50);
+
+	const presentStack = [];
+
+	let dir = Vec2.sub(center, pos0);
+	dir.normalize();
+	const flow01 = new Flow(pos0, dir.mul(100).add(pos0), 20.0, {r:0.0,g:0.0,b:0.0}, 1.0);
+	dir = Vec2.sub(center, pos1);
+	dir.normalize();
+	const flow02 = new Flow(pos1, dir.mul(100).add(pos1), 20.0, {r:0,g:0.0,b:0.0}, 1.0);
+	dir = Vec2.sub(center, pos2);
+	dir.normalize();
+	const flow03 = new Flow(pos2, dir.mul(100).add(pos2), 20.0, {r:0,g:0.0,b:0.0}, 1.0);
+	dir = Vec2.sub(center, pos3);
+	dir.normalize();
+	const flow04 = new Flow(pos3, dir.mul(100).add(pos3), 20.0, {r:0,g:0.0,b:0.0}, 1.0);
+	let flows = [flow01, flow02, flow03, flow04];
+
+	return {actors : [], 
+		obstacles : obstacles, 
+		flows : flows, 
+		presentStack : presentStack,
+		placeableObstacles : 0};
 }
 
 export const MAPS = [MAP_01, MAP_02, MAP_03];
